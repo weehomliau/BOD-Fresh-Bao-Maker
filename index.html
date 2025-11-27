@@ -35,54 +35,68 @@
         // --- 游戏配置 ---
         const GAME_DURATION = 60; 
 
+        // --- B.O.D 真实产品配方 ---
+        // 根据 baozhan.com.my 产品设定
         const RECIPES = [
           {
-            id: 'meat_bun',
-            name: '招牌生肉包',
-            description: 'B.O.D 销量冠军，鲜嫩多汁',
-            ingredients: ['面团', '独家生肉馅', '咸蛋黄'],
+            id: 'kungfu_bun',
+            name: '功夫肉包',
+            description: 'B.O.D 镇店之宝，酒香扑鼻',
+            ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
             color: 'bg-orange-100',
-            icon: '🥩',
-            difficulty: 1
+            icon: '🥋',
+            difficulty: 2
           },
           {
             id: 'bbq_bun',
-            name: '手工叉烧包',
-            description: '秘制酱汁，经典广式风味',
+            name: '御品叉烧包',
+            description: '独家秘制酱汁，肥瘦适中',
             ingredients: ['面团', '秘制叉烧'],
             color: 'bg-red-50',
             icon: '🍖',
             difficulty: 1
           },
           {
-            id: 'big_bun',
-            name: '特制大包',
-            description: '分量十足，一口满足',
-            ingredients: ['面团', '生肉馅', '鸡蛋', '腊肠'],
-            color: 'bg-yellow-50',
-            icon: '🍘',
-            difficulty: 2
+            id: 'lava_bun',
+            name: '咸蛋流沙包',
+            description: '爆浆口感，咸甜交织',
+            ingredients: ['面团', '咸蛋黄流沙'],
+            color: 'bg-yellow-100',
+            icon: '🥚',
+            difficulty: 1
           },
           {
-            id: 'red_bean',
-            name: '玫瑰豆沙包',
-            description: '香甜细腻，老少皆宜',
-            ingredients: ['面团', '红豆沙'],
-            color: 'bg-pink-50',
-            icon: '🫘',
+            id: 'mei_cai_bun',
+            name: '梅菜包',
+            description: '经典客家风味，咸香开胃',
+            ingredients: ['面团', '梅菜扣肉'],
+            color: 'bg-green-50',
+            icon: '🥬',
             difficulty: 1
+          },
+          {
+            id: 'cheese_pot',
+            name: '香香起司窝',
+            description: '年轻人的最爱，拉丝芝士',
+            ingredients: ['面团', '芝士碎', '培根'],
+            color: 'bg-yellow-50',
+            icon: '🧀',
+            difficulty: 2
           }
         ];
 
+        // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
           { id: '面团', name: '老面面团', icon: '⚪' },
-          { id: '独家生肉馅', name: '独家生肉馅', icon: '🥩' },
           { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖' },
-          { id: '咸蛋黄', name: '咸蛋黄', icon: '🥚' },
-          { id: '红豆沙', name: '红豆沙', icon: '🫘' },
-          { id: '鸡蛋', name: '全煮蛋', icon: '🥚' },
-          { id: '腊肠', name: '广式腊肠', icon: '🌭' },
-          { id: '生肉馅', name: '普通肉馅', icon: '🥓' }, 
+          { id: '猪肉片', name: '上等肉片', icon: '🥩' },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬' },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶' }, // 功夫肉包灵魂
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚' },
+          { id: '梅菜扣肉', name: '梅菜扣肉', icon: '🥘' },
+          { id: '芝士碎', name: '马苏里拉', icon: '🧀' },
+          { id: '培根', name: '烟熏培根', icon: '🥓' },
+          { id: '辣椒酱', name: '甘文阁辣椒', icon: '🌶️' }, // 干扰项 (BOD有卖这个酱，但通常不包在包子里)
         ];
 
         function BODGame() {
@@ -140,12 +154,14 @@
           const handleIngredientClick = (ing) => {
             if (cookingStep !== 'PREP') return;
 
+            // 检查该食材是否属于当前配方
             if (!currentOrder.ingredients.includes(ing.id)) {
               showFeedback('❌ 食材错误！不是这个配方', 'error');
               setWorktable([]);
               return;
             }
 
+            // 逻辑：必须先放面团
             if (worktable.length === 0 && ing.id !== '面团') {
               showFeedback('⚠️ 请先拿面团！', 'warning');
               return;
@@ -157,6 +173,7 @@
             const needed = [...currentOrder.ingredients].sort();
             const current = [...newWorktable].sort();
             
+            // 检查配方完成度
             if (JSON.stringify(needed) === JSON.stringify(current)) {
               showFeedback('✅ 食材备齐！开始捏褶！', 'success');
               setTimeout(() => setCookingStep('FOLDING'), 500);
@@ -248,8 +265,8 @@
                   <h1 className="text-4xl font-bold mb-2 text-white">B.O.D 包栈</h1>
                   <h2 className="text-2xl font-bold mb-6 text-yellow-300">极速包点师</h2>
                   <p className="text-gray-100 mb-8">
-                    传承手工温度，还原真实美味。<br/>
-                    在规定时间内，按照配方制作出完美的包子！
+                    还原 <span className="text-yellow-400 font-bold">B.O.D 包栈</span> 真实美味。<br/>
+                    制作 功夫肉包、咸蛋流沙包等招牌美食！
                   </p>
                   <button 
                     onClick={startGame}
@@ -320,6 +337,7 @@
                         <span className="text-xs font-bold text-red-600 uppercase tracking-wider">当前订单 New Order</span>
                     </div>
                     <h3 className="text-xl font-bold text-gray-800 mb-1">{currentOrder.name}</h3>
+                    <p className="text-xs text-gray-500 mb-2">{currentOrder.description}</p>
                     <div className="flex flex-wrap gap-1">
                       {currentOrder.ingredients.map((ing, idx) => (
                         <span key={idx} className={`text-xs px-2 py-0.5 rounded-full border ${worktable.includes(ing) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
