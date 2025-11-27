@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B.O.D 包栈：极速包点师</title>
+    
+    <!-- 1. 引入 Tailwind CSS (样式) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 引入 React 和 Babel (运行环境) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 解决浏览器模块兼容性问题 -->
+    <script async src="https://ga.jspm.io/npm:es-module-shims@1.7.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+      }
+    }
+    </script>
+</head>
+<body class="bg-neutral-900">
+    <div id="root"></div>
+
+    <!-- 3. 游戏核心代码 -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle } from 'lucide-react';
+
+        // --- 游戏配置 ---
+        const GAME_DURATION = 60; 
+
+        const RECIPES = [
+          {
+            id: 'meat_bun',
+            name: '招牌生肉包',
+            description: 'B.O.D 销量冠军，鲜嫩多汁',
+            ingredients: ['面团', '独家生肉馅', '咸蛋黄'],
+            color: 'bg-orange-100',
+            icon: '🥩',
+            difficulty: 1
+          },
+          {
+            id: 'bbq_bun',
+            name: '手工叉烧包',
+            description: '秘制酱汁，经典广式风味',
+            ingredients: ['面团', '秘制叉烧'],
+            color: 'bg-red-50',
+            icon: '🍖',
+            difficulty: 1
+          },
+          {
+            id: 'big_bun',
+            name: '特制大包',
+            description: '分量十足，一口满足',
+            ingredients: ['面团', '生肉馅', '鸡蛋', '腊肠'],
+            color: 'bg-yellow-50',
+            icon: '🍘',
+            difficulty: 2
+          },
+          {
+            id: 'red_bean',
+            name: '玫瑰豆沙包',
+            description: '香甜细腻，老少皆宜',
+            ingredients: ['面团', '红豆沙'],
+            color: 'bg-pink-50',
+            icon: '🫘',
+            difficulty: 1
+          }
+        ];
+
+        const INGREDIENTS_POOL = [
+          { id: '面团', name: '老面面团', icon: '⚪' },
+          { id: '独家生肉馅', name: '独家生肉馅', icon: '🥩' },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖' },
+          { id: '咸蛋黄', name: '咸蛋黄', icon: '🥚' },
+          { id: '红豆沙', name: '红豆沙', icon: '🫘' },
+          { id: '鸡蛋', name: '全煮蛋', icon: '🥚' },
+          { id: '腊肠', name: '广式腊肠', icon: '🌭' },
+          { id: '生肉馅', name: '普通肉馅', icon: '🥓' }, 
+        ];
+
+        function BODGame() {
+          const [gameState, setGameState] = useState('MENU'); 
+          const [score, setScore] = useState(0);
+          const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
+          const [currentOrder, setCurrentOrder] = useState(null);
+          const [worktable, setWorktable] = useState([]); 
+          const [cookingStep, setCookingStep] = useState('PREP'); 
+          const [foldProgress, setFoldProgress] = useState(0); 
+          const [steamProgress, setSteamProgress] = useState(0); 
+          const [feedback, setFeedback] = useState(null); 
+          
+          const timerRef = useRef(null);
+          const steamTimerRef = useRef(null);
+
+          useEffect(() => {
+            if (gameState === 'PLAYING') {
+              timerRef.current = setInterval(() => {
+                setTimeLeft((prev) => {
+                  if (prev <= 1) {
+                    endGame();
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
+            }
+            return () => clearInterval(timerRef.current);
+          }, [gameState]);
+
+          const generateNewOrder = () => {
+            const randomRecipe = RECIPES[Math.floor(Math.random() * RECIPES.length)];
+            setCurrentOrder(randomRecipe);
+            setWorktable([]);
+            setCookingStep('PREP');
+            setFoldProgress(0);
+            setSteamProgress(0);
+          };
+
+          const startGame = () => {
+            setScore(0);
+            setTimeLeft(GAME_DURATION);
+            generateNewOrder();
+            setGameState('PLAYING');
+            setFeedback(null);
+          };
+
+          const endGame = () => {
+            clearInterval(timerRef.current);
+            clearInterval(steamTimerRef.current);
+            setGameState('GAMEOVER');
+          };
+
+          const handleIngredientClick = (ing) => {
+            if (cookingStep !== 'PREP') return;
+
+            if (!currentOrder.ingredients.includes(ing.id)) {
+              showFeedback('❌ 食材错误！不是这个配方', 'error');
+              setWorktable([]);
+              return;
+            }
+
+            if (worktable.length === 0 && ing.id !== '面团') {
+              showFeedback('⚠️ 请先拿面团！', 'warning');
+              return;
+            }
+
+            const newWorktable = [...worktable, ing.id];
+            setWorktable(newWorktable);
+
+            const needed = [...currentOrder.ingredients].sort();
+            const current = [...newWorktable].sort();
+            
+            if (JSON.stringify(needed) === JSON.stringify(current)) {
+              showFeedback('✅ 食材备齐！开始捏褶！', 'success');
+              setTimeout(() => setCookingStep('FOLDING'), 500);
+            }
+          };
+
+          const handleFold = () => {
+            if (cookingStep !== 'FOLDING') return;
+            const increment = 15; 
+            const newProgress = foldProgress + increment;
+            
+            if (newProgress >= 100) {
+              setFoldProgress(100);
+              setCookingStep('STEAMING');
+              showFeedback('🥟 造型完美！放入蒸笼！', 'success');
+              startSteaming();
+            } else {
+              setFoldProgress(newProgress);
+            }
+          };
+
+          const startSteaming = () => {
+            let progress = 0;
+            steamTimerRef.current = setInterval(() => {
+              progress += 2; 
+              setSteamProgress(progress);
+              if (progress > 120) { 
+                clearInterval(steamTimerRef.current);
+                handleSteamResult(false, '🔥 蒸糊了！太久了！');
+              }
+            }, 50);
+          };
+
+          const handleStopSteam = () => {
+            clearInterval(steamTimerRef.current);
+            if (steamProgress >= 80 && steamProgress <= 100) {
+              handleSteamResult(true, '✨ 完美出炉！B.O.D 品质！');
+            } else if (steamProgress < 80) {
+              handleSteamResult(false, '❄️ 还没熟！里面是生的！');
+            } else {
+              handleSteamResult(false, '🔥 蒸过头了！皮老了！');
+            }
+          };
+
+          const handleSteamResult = (success, msg) => {
+            if (success) {
+              const points = 100 + Math.floor(timeLeft / 10);
+              setScore(prev => prev + points);
+              showFeedback(msg, 'success');
+              setTimeout(generateNewOrder, 1500);
+            } else {
+              showFeedback(msg, 'error');
+              setTimeLeft(prev => Math.max(0, prev - 5));
+              setTimeout(() => {
+                setWorktable([]);
+                setCookingStep('PREP');
+                setFoldProgress(0);
+                setSteamProgress(0);
+              }, 1500);
+            }
+          };
+
+          const showFeedback = (msg, type) => {
+            setFeedback({ msg, type });
+            setTimeout(() => setFeedback(null), 1500);
+          };
+
+          const getFeedbackColor = () => {
+            if (!feedback) return '';
+            if (feedback.type === 'error') return 'bg-red-500';
+            if (feedback.type === 'success') return 'bg-green-500';
+            return 'bg-yellow-500';
+          };
+
+          if (gameState === 'MENU') {
+            return (
+              <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-4 font-sans text-white relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+                     <div className="absolute top-10 left-10 text-9xl">🥟</div>
+                     <div className="absolute bottom-20 right-10 text-9xl">♨️</div>
+                </div>
+
+                <div className="bg-red-700 p-8 rounded-3xl shadow-2xl border-4 border-yellow-500 text-center max-w-md w-full z-10">
+                  <div className="mb-6 flex justify-center">
+                    <div className="bg-white p-4 rounded-full shadow-lg">
+                       <ChefHat size={64} className="text-red-700" />
+                    </div>
+                  </div>
+                  <h1 className="text-4xl font-bold mb-2 text-white">B.O.D 包栈</h1>
+                  <h2 className="text-2xl font-bold mb-6 text-yellow-300">极速包点师</h2>
+                  <p className="text-gray-100 mb-8">
+                    传承手工温度，还原真实美味。<br/>
+                    在规定时间内，按照配方制作出完美的包子！
+                  </p>
+                  <button 
+                    onClick={startGame}
+                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-4 px-8 rounded-xl text-xl transition-transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Utensils /> 开始制作
+                  </button>
+                </div>
+                <div className="mt-8 text-gray-500 text-sm">Made for B.O.D Games</div>
+              </div>
+            );
+          }
+
+          if (gameState === 'GAMEOVER') {
+            return (
+              <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-4 text-white">
+                <div className="bg-white text-neutral-900 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-8 border-red-600">
+                  <Trophy size={64} className="mx-auto text-yellow-500 mb-4" />
+                  <h2 className="text-3xl font-bold mb-2">营业结束</h2>
+                  <p className="text-gray-600 mb-6">今日战绩</p>
+                  
+                  <div className="text-6xl font-black text-red-600 mb-8 font-mono">
+                    {score}
+                  </div>
+
+                  <div className="space-y-3 mb-8">
+                     {score > 500 ? (
+                       <div className="bg-yellow-100 text-yellow-800 p-3 rounded-lg font-bold">🏆 恭喜获得：金牌包点师称号！</div>
+                     ) : (
+                       <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">再接再厉，手艺还需磨练！</div>
+                     )}
+                  </div>
+
+                  <button 
+                    onClick={() => setGameState('MENU')}
+                    className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <RotateCcw /> 返回主菜单
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (!currentOrder && gameState === 'PLAYING') {
+              return <div className="min-h-screen flex items-center justify-center bg-gray-100">准备中...</div>;
+          }
+
+          return (
+            <div className="min-h-screen bg-gray-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl overflow-hidden relative">
+              <div className="bg-red-700 text-white p-3 flex justify-between items-center shadow-md z-10">
+                <div className="flex items-center gap-2 font-bold text-xl">
+                  <div className="bg-red-800 p-1.5 rounded-lg"><Timer size={20}/></div>
+                  <span className={`${timeLeft < 10 ? 'text-yellow-300 animate-pulse' : ''}`}>{timeLeft}s</span>
+                </div>
+                <div className="font-black text-2xl text-yellow-400">
+                   {score} 分
+                </div>
+              </div>
+
+              <div className="bg-white p-4 border-b border-gray-200">
+                <div className="flex items-start gap-4">
+                  <div className="w-20 h-20 bg-orange-100 rounded-lg flex items-center justify-center text-4xl shadow-inner border border-orange-200">
+                    {currentOrder.icon}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-red-600 uppercase tracking-wider">当前订单 New Order</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-1">{currentOrder.name}</h3>
+                    <div className="flex flex-wrap gap-1">
+                      {currentOrder.ingredients.map((ing, idx) => (
+                        <span key={idx} className={`text-xs px-2 py-0.5 rounded-full border ${worktable.includes(ing) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                          {ing}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 bg-neutral-100 relative overflow-hidden flex flex-col">
+                
+                {feedback && (
+                  <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold flex items-center gap-2 animate-bounce ${getFeedbackColor()}`}>
+                    {feedback.type === 'success' ? <CheckCircle size={20}/> : <XCircle size={20}/>}
+                    {feedback.msg}
+                  </div>
+                )}
+
+                <div className="flex-1 flex flex-col items-center justify-center p-6 transition-all">
+                  
+                  {cookingStep === 'PREP' && (
+                    <div className="relative w-64 h-64 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center">
+                      {worktable.length === 0 && <span className="text-gray-300 font-bold">点击下方食材<br/>开始制作</span>}
+                      {worktable.includes('面团') && <div className="absolute w-56 h-56 bg-orange-50 rounded-full border border-orange-100 shadow-inner"></div>}
+                      {worktable.slice(1).map((ing, i) => (
+                        <div key={i} className="absolute text-4xl animate-in zoom-in duration-300" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
+                          {INGREDIENTS_POOL.find(p => p.id === ing)?.icon}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {cookingStep === 'FOLDING' && (
+                    <div className="flex flex-col items-center w-full">
+                       <div 
+                         className="w-56 h-56 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform relative overflow-hidden"
+                         onClick={handleFold}
+                       >
+                         <div className="text-6xl animate-pulse">🥟</div>
+                         <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
+                       </div>
+                       <p className="mt-6 text-gray-500 font-bold animate-pulse">疯狂点击包子进行捏褶！</p>
+                       <div className="w-64 h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                         <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div>
+                       </div>
+                    </div>
+                  )}
+
+                  {cookingStep === 'STEAMING' && (
+                    <div className="flex flex-col items-center w-full">
+                       <div className="w-64 h-64 bg-gray-200 rounded-3xl relative overflow-hidden border-b-8 border-gray-300 flex items-center justify-center">
+                          <Flame className={`absolute text-orange-500 opacity-20 w-full h-full animate-pulse`} />
+                          <div className="z-10 text-8xl">♨️</div>
+                          
+                          <div className="absolute bottom-0 left-0 w-2 h-full bg-gray-300">
+                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                          </div>
+                          
+                          <div className="absolute bottom-[80%] left-0 w-full h-0.5 bg-green-500 z-20"></div>
+                          <div className="absolute bottom-[100%] left-0 w-full h-0.5 bg-red-500 z-20"></div>
+                       </div>
+                       
+                       <button 
+                         onMouseDown={handleStopSteam}
+                         onTouchStart={handleStopSteam}
+                         className="mt-6 bg-red-600 text-white font-bold py-4 px-12 rounded-full text-xl shadow-lg active:bg-red-700 active:scale-95 transition-all"
+                       >
+                         立即出炉!
+                       </button>
+                       <p className="mt-2 text-xs text-gray-500">当指示条到达绿色区域时点击</p>
+                    </div>
+                  )}
+
+                </div>
+
+                {cookingStep === 'PREP' && (
+                  <div className="bg-white p-4 pb-8 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10">
+                    <h4 className="text-xs font-bold text-gray-400 mb-3 uppercase text-center">食材选择 Ingredients</h4>
+                    <div className="grid grid-cols-4 gap-3">
+                      {INGREDIENTS_POOL.map((ing) => (
+                        <button
+                          key={ing.id}
+                          onClick={() => handleIngredientClick(ing)}
+                          className="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 active:scale-90 transition-all aspect-square"
+                        >
+                          <span className="text-2xl mb-1">{ing.icon}</span>
+                          <span className="text-[10px] font-medium text-gray-600 leading-tight text-center">{ing.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<BODGame />);
+    </script>
+</body>
+</html>
