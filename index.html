@@ -30,13 +30,88 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe } from 'lucide-react';
+        
+        // --- Firebase 导入 ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
         // --- 游戏配置 ---
         const GAME_DURATION = 60; 
 
-        // --- B.O.D 真实产品配方 ---
-        // 根据 baozhan.com.my 产品设定
+        // ==========================================
+        // ▼▼▼ FIREBASE 配置 ▼▼▼
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyADgrOOUC0C1fCuFyjeggJCgAPYewz6AEA",
+            authDomain: "bod-fresh-bao-maker.firebaseapp.com",
+            projectId: "bod-fresh-bao-maker",
+            storageBucket: "bod-fresh-bao-maker.firebasestorage.app",
+            messagingSenderId: "326015657318",
+            appId: "1:326015657318:web:40ad92d97a662e80f8d4a7",
+            measurementId: "G-SYYFVWFLYN"
+        };
+        // ==========================================
+
+        // --- 初始化数据库 ---
+        let db = null;
+        let isOnline = false;
+
+        if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                const analytics = getAnalytics(app); 
+                db = getFirestore(app);
+                isOnline = true;
+                console.log("🔥 Firebase 连接成功：全球排行榜已激活");
+            } catch (e) {
+                console.error("Firebase 初始化失败:", e);
+            }
+        } else {
+            console.log("⚠️ 未检测到 Firebase 配置，将使用本地离线排行榜。");
+        }
+
+        // --- 排行榜逻辑 ---
+        
+        const getLeaderboard = async () => {
+          if (isOnline && db) {
+            try {
+                const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
+                const querySnapshot = await getDocs(q);
+                return querySnapshot.docs.map(doc => doc.data());
+            } catch (error) {
+                console.error("读取排行榜失败", error);
+                return [];
+            }
+          } else {
+            const saved = localStorage.getItem('bod_leaderboard');
+            return saved ? JSON.parse(saved) : [];
+          }
+        };
+
+        const saveScoreToLeaderboard = async (name, score) => {
+          const newEntry = { name, score, date: new Date().toISOString() };
+          
+          if (isOnline && db) {
+            try {
+                await addDoc(collection(db, "leaderboard"), newEntry);
+                return await getLeaderboard();
+            } catch (error) {
+                console.error("上传成绩失败", error);
+                return [];
+            }
+          } else {
+            const current = localStorage.getItem('bod_leaderboard') ? JSON.parse(localStorage.getItem('bod_leaderboard')) : [];
+            const updated = [...current, newEntry].sort((a, b) => b.score - a.score).slice(0, 10);
+            localStorage.setItem('bod_leaderboard', JSON.stringify(updated));
+            return updated;
+          }
+        };
+
+
+        // --- B.O.D 真实产品配方 (在此处添加图片链接) ---
+        // 使用方法：将 image: "" 替换为 image: "./images/xxx.jpg"
         const RECIPES = [
           {
             id: 'kungfu_bun',
@@ -45,6 +120,7 @@
             ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
             color: 'bg-orange-100',
             icon: '🥋',
+            image: "", // <--- 在这里填入图片链接
             difficulty: 2
           },
           {
@@ -54,6 +130,7 @@
             ingredients: ['面团', '秘制叉烧'],
             color: 'bg-red-50',
             icon: '🍖',
+            image: "", 
             difficulty: 1
           },
           {
@@ -63,6 +140,7 @@
             ingredients: ['面团', '咸蛋黄流沙'],
             color: 'bg-yellow-100',
             icon: '🥚',
+            image: "", 
             difficulty: 1
           },
           {
@@ -72,6 +150,7 @@
             ingredients: ['面团', '梅菜扣肉'],
             color: 'bg-green-50',
             icon: '🥬',
+            image: "", 
             difficulty: 1
           },
           {
@@ -81,21 +160,22 @@
             ingredients: ['面团', '芝士碎', '培根'],
             color: 'bg-yellow-50',
             icon: '🧀',
+            image: "", 
             difficulty: 2
           }
         ];
 
-        // --- 对应食材库 ---
+        // --- 对应食材库 (在此处添加图片链接) ---
         const INGREDIENTS_POOL = [
-          { id: '面团', name: '老面面团', icon: '⚪' },
-          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖' },
-          { id: '猪肉片', name: '上等肉片', icon: '🥩' },
-          { id: '包菜', name: '新鲜包菜', icon: '🥬' },
-          { id: '花雕酒', name: '陈年花雕', icon: '🍶' }, // 功夫肉包灵魂
-          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚' },
-          { id: '梅菜扣肉', name: '梅菜扣肉', icon: '🥘' },
-          { id: '芝士碎', name: '起司', icon: '🧀' },
-          { id: '培根', name: '烟熏培根', icon: '🥓' },
+          { id: '面团', name: '老面面团', icon: '⚪', image: "" },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "" },
+          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "" },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "" },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "" }, 
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "" },
+          { id: '梅菜扣肉', name: '梅菜扣肉', icon: '🥘', image: "" },
+          { id: '芝士碎', name: '起司', icon: '🧀', image: "" },
+          { id: '培根', name: '烟熏培根', icon: '🥓', image: "" },
         ];
 
         function BODGame() {
@@ -108,7 +188,11 @@
           const [foldProgress, setFoldProgress] = useState(0); 
           const [steamProgress, setSteamProgress] = useState(0); 
           const [feedback, setFeedback] = useState(null); 
-          
+          const [playerName, setPlayerName] = useState('');
+          const [isScoreSaved, setIsScoreSaved] = useState(false);
+          const [leaderboardData, setLeaderboardData] = useState([]);
+          const [isLoadingRank, setIsLoadingRank] = useState(false);
+
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
 
@@ -127,6 +211,16 @@
             return () => clearInterval(timerRef.current);
           }, [gameState]);
 
+          useEffect(() => {
+            if (gameState === 'LEADERBOARD') {
+                setIsLoadingRank(true);
+                getLeaderboard().then(data => {
+                    setLeaderboardData(data);
+                    setIsLoadingRank(false);
+                });
+            }
+          }, [gameState]);
+
           const generateNewOrder = () => {
             const randomRecipe = RECIPES[Math.floor(Math.random() * RECIPES.length)];
             setCurrentOrder(randomRecipe);
@@ -142,6 +236,8 @@
             generateNewOrder();
             setGameState('PLAYING');
             setFeedback(null);
+            setIsScoreSaved(false);
+            setPlayerName('');
           };
 
           const endGame = () => {
@@ -150,17 +246,28 @@
             setGameState('GAMEOVER');
           };
 
+          const handleSaveScore = async () => {
+            if (!playerName.trim()) {
+              showFeedback('✍️ 请输入名字！', 'error');
+              return;
+            }
+            setIsLoadingRank(true);
+            await saveScoreToLeaderboard(playerName, score);
+            setIsScoreSaved(true);
+            showFeedback('💾 成绩已保存！', 'success');
+            setIsLoadingRank(false);
+            setTimeout(() => setGameState('LEADERBOARD'), 1000);
+          };
+
           const handleIngredientClick = (ing) => {
             if (cookingStep !== 'PREP') return;
 
-            // 检查该食材是否属于当前配方
             if (!currentOrder.ingredients.includes(ing.id)) {
               showFeedback('❌ 食材错误！不是这个配方', 'error');
               setWorktable([]);
               return;
             }
 
-            // 逻辑：必须先放面团
             if (worktable.length === 0 && ing.id !== '面团') {
               showFeedback('⚠️ 请先拿面团！', 'warning');
               return;
@@ -172,7 +279,6 @@
             const needed = [...currentOrder.ingredients].sort();
             const current = [...newWorktable].sort();
             
-            // 检查配方完成度
             if (JSON.stringify(needed) === JSON.stringify(current)) {
               showFeedback('✅ 食材备齐！开始捏褶！', 'success');
               setTimeout(() => setCookingStep('FOLDING'), 500);
@@ -247,6 +353,8 @@
             return 'bg-yellow-500';
           };
 
+          // --- 界面渲染 ---
+
           if (gameState === 'MENU') {
             return (
               <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-4 font-sans text-white relative overflow-hidden">
@@ -263,18 +371,79 @@
                   </div>
                   <h1 className="text-4xl font-bold mb-2 text-white">B.O.D 包栈</h1>
                   <h2 className="text-2xl font-bold mb-6 text-yellow-300">极速包点师</h2>
-                  <p className="text-gray-100 mb-8">
-                    还原 <span className="text-yellow-400 font-bold">B.O.D 包栈</span> 真实美味。<br/>
-                    制作 功夫肉包、咸蛋流沙包等招牌美食！
-                  </p>
-                  <button 
-                    onClick={startGame}
-                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-4 px-8 rounded-xl text-xl transition-transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <Utensils /> 开始制作
-                  </button>
+                  
+                  <div className="flex flex-col gap-3">
+                    <button 
+                      onClick={startGame}
+                      className="w-full bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-4 px-8 rounded-xl text-xl transition-transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <Utensils /> 开始制作
+                    </button>
+                    <button 
+                      onClick={() => setGameState('LEADERBOARD')}
+                      className="w-full bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-8 rounded-xl text-lg transition-transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 border border-red-600"
+                    >
+                      <Trophy size={20} /> 查看排行榜
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-8 text-gray-500 text-sm">Made for B.O.D Games</div>
+              </div>
+            );
+          }
+
+          if (gameState === 'LEADERBOARD') {
+            return (
+              <div className="min-h-screen bg-neutral-900 flex flex-col items-center p-4 text-white overflow-y-auto">
+                 <div className="w-full max-w-md mt-8">
+                   <div className="flex items-center justify-between mb-6">
+                      <button onClick={() => setGameState('MENU')} className="bg-neutral-800 p-2 rounded-full hover:bg-neutral-700"><ArrowLeft /></button>
+                      <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2"><Trophy className="text-yellow-400" /> 包点大师榜</h2>
+                      <div className="w-10"></div>
+                   </div>
+                   
+                   <div className="text-center mb-4 text-xs text-gray-400">
+                     {isOnline ? <span className="text-green-400 flex items-center justify-center gap-1"><Globe size={12}/> 全球联网模式</span> : <span className="text-gray-500">离线模式 (填入 Key 开启联网)</span>}
+                   </div>
+
+                   <div className="bg-white text-neutral-900 rounded-2xl shadow-xl overflow-hidden min-h-[300px]">
+                      <div className="bg-red-600 p-4 text-white font-bold grid grid-cols-12 text-sm text-center">
+                        <div className="col-span-2">排名</div>
+                        <div className="col-span-6 text-left pl-4">包点师</div>
+                        <div className="col-span-4">分数</div>
+                      </div>
+                      
+                      {isLoadingRank ? (
+                          <div className="p-8 text-center text-gray-500 flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></div>
+                            读取中...
+                          </div>
+                      ) : leaderboardData.length === 0 ? (
+                        <div className="p-8 text-center text-gray-400">
+                          暂无记录，快去挑战吧！
+                        </div>
+                      ) : (
+                        <div>
+                          {leaderboardData.map((entry, index) => (
+                            <div key={index} className={`grid grid-cols-12 items-center p-4 border-b text-center ${index < 3 ? 'bg-yellow-50' : ''}`}>
+                              <div className="col-span-2 font-bold flex justify-center">
+                                {index === 0 && <Crown size={20} className="text-yellow-500" fill="currentColor" />}
+                                {index === 1 && <Crown size={20} className="text-gray-400" fill="currentColor" />}
+                                {index === 2 && <Crown size={20} className="text-orange-400" fill="currentColor" />}
+                                {index > 2 && <span className="text-gray-500 text-sm">#{index + 1}</span>}
+                              </div>
+                              <div className="col-span-6 text-left pl-4 font-bold text-gray-800 truncate">
+                                {entry.name}
+                              </div>
+                              <div className="col-span-4 font-mono font-bold text-red-600 text-lg">
+                                {entry.score}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                   </div>
+                 </div>
               </div>
             );
           }
@@ -285,25 +454,62 @@
                 <div className="bg-white text-neutral-900 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-8 border-red-600">
                   <Trophy size={64} className="mx-auto text-yellow-500 mb-4" />
                   <h2 className="text-3xl font-bold mb-2">营业结束</h2>
-                  <p className="text-gray-600 mb-6">今日战绩</p>
+                  <p className="text-gray-600 mb-6">本次得分</p>
                   
                   <div className="text-6xl font-black text-red-600 mb-8 font-mono">
                     {score}
                   </div>
 
-                  <div className="space-y-3 mb-8">
-                     {score > 500 ? (
-                       <div className="bg-yellow-100 text-yellow-800 p-3 rounded-lg font-bold">🏆 恭喜获得：金牌包点师称号！</div>
-                     ) : (
-                       <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">再接再厉，手艺还需磨练！</div>
-                     )}
-                  </div>
+                  {!isScoreSaved ? (
+                    <div className="mb-8">
+                       <p className="text-sm text-gray-500 mb-2">输入名字保存到排行榜</p>
+                       <div className="flex gap-2">
+                         <div className="relative flex-1">
+                           <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                           <input 
+                              type="text" 
+                              value={playerName}
+                              onChange={(e) => setPlayerName(e.target.value)}
+                              placeholder="您的名字"
+                              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold"
+                              maxLength={10}
+                           />
+                         </div>
+                         <button 
+                            onClick={handleSaveScore}
+                            disabled={isLoadingRank}
+                            className={`bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-xl flex items-center ${isLoadingRank ? 'opacity-50 cursor-not-allowed' : ''}`}
+                         >
+                            {isLoadingRank ? '...' : '保存'}
+                         </button>
+                       </div>
+                    </div>
+                  ) : (
+                    <div className="mb-8 p-3 bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2">
+                      <CheckCircle size={20} /> 成绩已上传
+                    </div>
+                  )}
 
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setGameState('LEADERBOARD')}
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Trophy size={18}/> 排行榜
+                    </button>
+                    <button 
+                      onClick={startGame}
+                      className="bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <RotateCcw size={18}/> 再玩一次
+                    </button>
+                  </div>
+                  
                   <button 
                     onClick={() => setGameState('MENU')}
-                    className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm font-medium py-2"
                   >
-                    <RotateCcw /> 返回主菜单
+                    返回主菜单
                   </button>
                 </div>
               </div>
@@ -328,8 +534,13 @@
 
               <div className="bg-white p-4 border-b border-gray-200">
                 <div className="flex items-start gap-4">
-                  <div className="w-20 h-20 bg-orange-100 rounded-lg flex items-center justify-center text-4xl shadow-inner border border-orange-200">
-                    {currentOrder.icon}
+                  {/* --- 订单图片显示逻辑 --- */}
+                  <div className="w-20 h-20 bg-orange-100 rounded-lg flex items-center justify-center text-4xl shadow-inner border border-orange-200 overflow-hidden">
+                    {currentOrder.image ? (
+                        <img src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-cover" />
+                    ) : (
+                        currentOrder.icon
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
@@ -362,12 +573,20 @@
                   {cookingStep === 'PREP' && (
                     <div className="relative w-64 h-64 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center">
                       {worktable.length === 0 && <span className="text-gray-300 font-bold">点击下方食材<br/>开始制作</span>}
+                      {/* --- 工作台食材显示逻辑 --- */}
                       {worktable.includes('面团') && <div className="absolute w-56 h-56 bg-orange-50 rounded-full border border-orange-100 shadow-inner"></div>}
-                      {worktable.slice(1).map((ing, i) => (
-                        <div key={i} className="absolute text-4xl animate-in zoom-in duration-300" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
-                          {INGREDIENTS_POOL.find(p => p.id === ing)?.icon}
-                        </div>
-                      ))}
+                      {worktable.slice(1).map((ing, i) => {
+                          const ingredient = INGREDIENTS_POOL.find(p => p.id === ing);
+                          return (
+                            <div key={i} className="absolute text-4xl animate-in zoom-in duration-300 flex items-center justify-center" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
+                              {ingredient?.image ? (
+                                  <img src={ingredient.image} className="w-12 h-12 object-contain drop-shadow-md" />
+                              ) : (
+                                  ingredient?.icon
+                              )}
+                            </div>
+                          );
+                      })}
                     </div>
                   )}
 
@@ -377,7 +596,12 @@
                          className="w-56 h-56 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform relative overflow-hidden"
                          onClick={handleFold}
                        >
-                         <div className="text-6xl animate-pulse">🥟</div>
+                         {/* 显示当前正在制作的包子的图片(如果有)或默认图标 */}
+                         {currentOrder.image ? (
+                             <img src={currentOrder.image} className="w-full h-full object-cover" />
+                         ) : (
+                             <div className="text-6xl animate-pulse">🥟</div>
+                         )}
                          <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
                        </div>
                        <p className="mt-6 text-gray-500 font-bold animate-pulse">疯狂点击包子进行捏褶！</p>
@@ -422,9 +646,16 @@
                         <button
                           key={ing.id}
                           onClick={() => handleIngredientClick(ing)}
-                          className="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 active:scale-90 transition-all aspect-square"
+                          className="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 active:scale-90 transition-all aspect-square overflow-hidden"
                         >
-                          <span className="text-2xl mb-1">{ing.icon}</span>
+                          {/* --- 按钮图片显示逻辑 --- */}
+                          <div className="w-10 h-10 flex items-center justify-center mb-1">
+                              {ing.image ? (
+                                  <img src={ing.image} alt={ing.name} className="w-full h-full object-contain" />
+                              ) : (
+                                  <span className="text-2xl">{ing.icon}</span>
+                              )}
+                          </div>
                           <span className="text-[10px] font-medium text-gray-600 leading-tight text-center">{ing.name}</span>
                         </button>
                       ))}
