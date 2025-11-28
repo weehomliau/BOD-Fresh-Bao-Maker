@@ -139,7 +139,6 @@
             if (!src) return fallbackIcon;
 
             return (
-                // 修复：添加 w-full h-full 确保容器有尺寸
                 <div className={`relative ${className} w-full h-full flex items-center justify-center overflow-hidden`}>
                     <img 
                         src={src} 
@@ -156,7 +155,7 @@
                     )}
 
                     {status === 'error' && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-100/10">
+                        <div className="absolute inset-0 flex items-center justify-center">
                             {fallbackIcon}
                         </div>
                     )}
@@ -220,26 +219,26 @@
             id: 'red_bean_bun',
             name: '豆沙包',
             description: '经典红豆，香甜细腻',
-            ingredients: ['面团', '天津红豆沙'],
+            ingredients: ['面团', '天津红豆'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🫘</span>,
-            image: "assets/red_bean_bun.png",
+            image: "./assets/red_bean_bun.png",
             difficulty: 1
           }
         ];
 
         // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
-          { id: '面团', name: '老面面团', icon: '⚪', image: "assets/dough.png" },
-          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "assets/char_siu.png" },
-          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "assets/pork.png" },
-          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "assets/cabbage.png" },
-          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
-          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
-          { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
+          { id: '面团', name: '老面面团', icon: '⚪', image: "./assets/dough.png" },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "./assets/char_siu.png" },
+          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "./assets/pork.png" },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "./assets/cabbage.png" },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "./assets/wine.png" }, 
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "./assets/salted_egg.png" },
+          { id: '梅菜', name: '梅菜', icon: '🥘', image: "./assets/mei_cai.png" },
           { id: '芝士碎', name: '起司', icon: '🧀', image: "" }, 
-          { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
-          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "assets/red_bean_paste.png" },
+          { id: '培根', name: '烟熏培根', icon: '🥓', image: "./assets/bacon.png" },
+          { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "./assets/red_bean_paste.png" },
         ];
 
         function BODGame() {
@@ -652,16 +651,20 @@
 
               <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
+                  {/* 修正：恢复了 bg-orange-100, border, shadow-inner 样式 */}
                   <div className="w-28 h-28 min-w-[7rem] bg-orange-100 rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
-                    <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" fallbackIcon={currentOrder.icon} />
+                    {/* 修正：恢复了 object-contain 和 drop-shadow */}
+                    <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
                   </div>
-                  <div className="flex-1 overflow-hidden">
+                  {/* 修复：移除了 overflow-hidden，允许 CheckCircle 溢出显示 */}
+                  <div className="flex-1 min-w-0"> 
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
                     </div>
                     <h3 className="text-2xl font-black text-gray-800 mb-2 truncate leading-tight">{currentOrder.name}</h3>
                     
-                    <div className="flex flex-wrap gap-1.5">
+                    {/* 修复：添加 pl-1 确保左边第一个元素的 scaling 边框不被切掉 */}
+                    <div className="flex flex-wrap gap-1.5 pl-1">
                       {currentOrder.ingredients.map((ingName, idx) => {
                          const isCollected = worktable.includes(ingName);
                          const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
@@ -669,7 +672,8 @@
                             <div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
                                <span className="text-sm">{ingData?.icon}</span>
                                <span className="text-xs font-bold">{ingName}</span>
-                               {isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 bg-white text-green-500 rounded-full" />}
+                               {/* 修正：去掉了 CheckCircle 的 bg-white，解决了遮挡问题 */}
+                               {isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full bg-green-100" />}
                             </div>
                          );
                       })}
@@ -710,6 +714,7 @@
                                 })}
                             </div>
                             
+                            {/* --- 重置/垃圾桶按钮 --- */}
                             {worktable.length > 0 && (
                                 <button 
                                     onClick={handleResetWorktable}
@@ -750,22 +755,48 @@
 
                   {cookingStep === 'STEAMING' && (
                     <div className="flex flex-col items-center w-full justify-center h-full">
-                       <div className="relative w-36 h-28 transform-style-3d rotate-x-[15deg]">
-                          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                 <div className="text-4xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                 <div className="text-3xl opacity-0 animate-steam absolute -left-6 top-3" style={{animationDelay: '0.8s'}}>☁️</div>
-                                 <div className="text-3xl opacity-0 animate-steam absolute left-6 top-3" style={{animationDelay: '1.6s'}}>☁️</div>
+                       <div className="relative w-64 h-64 flex items-center justify-center"> {/* Increased size for image */}
+                          
+                          {/* 蒸汽动画 (保持在顶部) */}
+                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                 <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                 <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
+                                 <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
                           </div>
-                          <div className="w-full h-full bg-gradient-to-b from-orange-100 to-orange-300 rounded-[15px] shadow-[0_15px_25px_rgba(0,0,0,0.3)] relative border-b-8 border-orange-400 animate-pump flex items-center justify-center">
-                             <div className="absolute -top-6 left-0 w-full h-12 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                <span className="text-4xl">♨️</span>
-                             </div>
-                             <div className="absolute -right-8 bottom-0 w-4 h-28 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-50">
-                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20"></div>
+
+                          {/* 蒸笼图片 */}
+                          <div className="w-full h-full relative animate-pump">
+                             <SafeImage 
+                                src="./assets/steamer.png" 
+                                alt="Steamer" 
+                                className="w-full h-full object-contain drop-shadow-xl" 
+                                fallbackIcon={
+                                    // 移除了 CSS 蒸笼的 margin-top，防止错位
+                                    <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
+                                        <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                            <span className="text-6xl">♨️</span>
+                                        </div>
+                                    </div>
+                                } 
+                             />
+                          </div>
+
+                          {/* 温度计 (保持在右侧) */}
+                          <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
+                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div> {/* Target Line */}
                                 <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
                                 <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
-                                <div className="absolute top-0 left-1 w-1 h-full bg-white opacity-40"></div>
-                             </div>
+                                {/* Glass shine */}
+                                <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
+                                {/* Tick marks */}
+                                <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[40%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[50%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[60%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[70%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[80%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[90%] w-1.5 h-px bg-gray-400"></div>
                           </div>
                        </div>
                        
@@ -785,8 +816,8 @@
                 {cookingStep === 'PREP' && (
                   <div className="bg-white p-2 pb-4 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 animate-in slide-in-from-bottom duration-500 shrink-0">
                     <h4 className="text-[10px] font-bold text-gray-400 mb-1.5 uppercase text-center">点击添加食材 Ingredients</h4>
-                    {/* 修改：grid-cols-4 -> grid-cols-5, gap-2 -> gap-1，让两行刚好放下10个食材 */}
-                    <div className="grid grid-cols-5 gap-1 px-1">
+                    {/* 修正：恢复 5 列布局，确保10个食材排2行 */}
+                    <div className="grid grid-cols-5 gap-2 px-1">
                       {INGREDIENTS_POOL.map((ing) => {
                         const isNeeded = currentOrder.ingredients.includes(ing.id);
                         const isAdded = worktable.includes(ing.id);
@@ -799,22 +830,20 @@
                         <button
                           key={ing.id}
                           onClick={() => handleIngredientClick(ing)}
-                          /* 修改：p-1 -> p-0.5 减小内边距 */
-                          className={`flex flex-col items-center justify-center p-0.5 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
+                          className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
                              ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
                           `}
                         >
-                          <div className={`w-8 h-8 flex items-center justify-center mb-0.5 transition-transform`}>
+                          <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
                               <SafeImage 
                                 key={ing.image} // 强制刷新
                                 src={ing.image} 
                                 alt={ing.name} 
                                 className="w-full h-full object-contain" 
-                                fallbackIcon={<span className="text-xl">{ing.icon}</span>}
+                                fallbackIcon={<span className="text-3xl">{ing.icon}</span>}
                               />
                           </div>
-                          {/* 修改：字体稍微调小一点 text-[8px] 以适应更窄的框 */}
-                          <span className={`text-[8px] font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
+                          <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
                         </button>
                       )})}
                     </div>
