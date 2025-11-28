@@ -33,8 +33,8 @@
         100% { transform: scale(1); }
       }
       @keyframes steam-pump {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.02); }
+        0%, 100% { transform: scaleY(1); }
+        50% { transform: scaleY(1.02); }
       }
 
       .animate-float { animation: float 6s ease-in-out infinite; }
@@ -103,7 +103,6 @@
         const getLeaderboard = async () => {
           if (isOnline && db) {
             try {
-                // 修改此处：将 limit(10) 改为 limit(30)
                 const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(30));
                 const querySnapshot = await getDocs(q);
                 return querySnapshot.docs.map(doc => doc.data());
@@ -123,7 +122,6 @@
             } catch (error) { return []; }
           } else {
             const current = localStorage.getItem('bod_leaderboard') ? JSON.parse(localStorage.getItem('bod_leaderboard')) : [];
-            // 修改此处：将 slice(0, 10) 改为 slice(0, 30)
             const updated = [...current, newEntry].sort((a, b) => b.score - a.score).slice(0, 30);
             localStorage.setItem('bod_leaderboard', JSON.stringify(updated));
             return updated;
@@ -141,7 +139,8 @@
             if (!src) return fallbackIcon;
 
             return (
-                <div className={`relative ${className} flex items-center justify-center overflow-hidden`}>
+                // 修复：添加 w-full h-full 确保容器有尺寸
+                <div className={`relative ${className} w-full h-full flex items-center justify-center overflow-hidden`}>
                     <img 
                         src={src} 
                         alt={alt} 
@@ -157,7 +156,7 @@
                     )}
 
                     {status === 'error' && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-100/10">
                             {fallbackIcon}
                         </div>
                     )}
@@ -174,7 +173,7 @@
             ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
             color: 'bg-orange-100',
             icon: <span className="text-4xl">🥋</span>,
-            image: "./assets/kungfu_bun.png", 
+            image: "assets/kungfu_bun.png", 
             difficulty: 2
           },
           {
@@ -184,7 +183,7 @@
             ingredients: ['面团', '秘制叉烧'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🍖</span>,
-            image: "./assets/bbq_bun.png",
+            image: "assets/bbq_bun.png",
             difficulty: 1
           },
           {
@@ -194,7 +193,7 @@
             ingredients: ['面团', '咸蛋黄流沙'],
             color: 'bg-yellow-100',
             icon: <span className="text-4xl">🥚</span>,
-            image: "./assets/lava_bun.png",
+            image: "assets/lava_bun.png",
             difficulty: 1
           },
           {
@@ -204,7 +203,7 @@
             ingredients: ['面团', '梅菜'],
             color: 'bg-green-50',
             icon: <span className="text-4xl">🥬</span>,
-            image: "./assets/mei_cai_bun.png",
+            image: "assets/mei_cai_bun.png",
             difficulty: 1
           },
           {
@@ -214,7 +213,7 @@
             ingredients: ['面团', '芝士碎', '培根'],
             color: 'bg-yellow-50',
             icon: <span className="text-4xl">🧀</span>,
-            image: "./assets/cheese_bun.png",
+            image: "assets/cheese_bun.png",
             difficulty: 2
           },
           {
@@ -224,23 +223,23 @@
             ingredients: ['面团', '天津红豆沙'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🫘</span>,
-            image: "./assets/red_bean_bun.png",
+            image: "assets/red_bean_bun.png",
             difficulty: 1
           }
         ];
 
         // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
-          { id: '面团', name: '老面面团', icon: '⚪', image: "./assets/dough.png" },
-          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "./assets/char_siu.png" },
-          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "./assets/pork.png" },
-          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "./assets/cabbage.png" },
-          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "./assets/wine.png" }, 
-          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "./assets/salted_egg.png" },
-          { id: '梅菜', name: '梅菜', icon: '🥘', image: "./assets/mei_cai.png" },
+          { id: '面团', name: '老面面团', icon: '⚪', image: "assets/dough.png" },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "assets/char_siu.png" },
+          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "assets/pork.png" },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "assets/cabbage.png" },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
+          { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
           { id: '芝士碎', name: '起司', icon: '🧀', image: "" }, 
-          { id: '培根', name: '烟熏培根', icon: '🥓', image: "./assets/bacon.png" },
-          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "./assets/red_bean_paste.png" },
+          { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
+          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "assets/red_bean_paste.png" },
         ];
 
         function BODGame() {
@@ -454,31 +453,22 @@
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
-                {/* 已移除漂浮的 Emoji 装饰 */}
-
-                {/* 修复重点：
-                   1. min-h-0: 允许容器在空间不足时压缩，防止溢出
-                   2. justify-center: 内容垂直居中
-                */}
+                {/* 修复重点：flex-1 + min-h-0 + 确保子元素有 h-full */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop min-h-0">
                     
-                    {/* 封面图容器：
-                       1. flex-1: 占据剩余空间
-                       2. min-h-0: 关键属性，允许 flex 子项高度小于内容高度（实现缩放）
-                       3. mb-4: 与按钮保持间距
-                    */}
+                    {/* 封面图容器：flex-1 占据所有剩余空间 */}
                     <div className="w-full flex-1 min-h-0 mb-6 relative flex items-center justify-center">
+                        {/* 图片：h-full 撑满容器 */}
                         <SafeImage 
                             src="assets/cover.png" 
                             alt="B.O.D Game Cover" 
-                            // 图片样式：限制最大宽高，保持比例，圆角
                             className="max-h-full max-w-full object-contain rounded-2xl drop-shadow-2xl" 
                             fallbackIcon={
-                                // Fallback 样式：高度设为 100% 但受父容器 max-h 限制，去除固定 padding 改为 flex 居中
-                                <div className="w-full max-h-full aspect-[4/5] flex flex-col items-center justify-center text-center p-4 bg-white/90 backdrop-blur rounded-3xl shadow-xl border-4 border-orange-200">
+                                <div className="w-full h-full aspect-[4/5] max-h-full flex flex-col items-center justify-center text-center p-4 bg-white/90 backdrop-blur rounded-3xl shadow-xl border-4 border-orange-200">
                                     <ChefHat size={80} className="text-red-600 mx-auto mb-4 shrink-0" />
                                     <h1 className="text-3xl font-black text-red-800 shrink-0">B.O.D 包栈</h1>
                                     <p className="text-orange-600 font-bold mt-2 shrink-0">极速包点师</p>
+                                    <p className="text-xs text-gray-400 mt-2">图片未加载: assets/cover.png</p>
                                 </div>
                             }
                         />
@@ -733,65 +723,6 @@
                     </div>
                   )}
 
-                  {cookingStep === 'STEAMING' && (
-                    <div className="flex flex-col items-center w-full justify-center h-full">
-                       {/* 蒸笼容器 */}
-                       <div className="relative w-64 h-64 flex items-center justify-center"> {/* Increased size for image */}
-                          
-                          {/* 蒸汽动画 (保持在顶部) */}
-                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                 <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                 <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
-                                 <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
-                          </div>
-
-                          {/* 蒸笼图片 */}
-                          <div className="w-full h-full relative animate-pump">
-                             <SafeImage 
-                                src="./assets/steamer.png" 
-                                alt="Steamer" 
-                                className="w-full h-full object-contain drop-shadow-xl" 
-                                fallbackIcon={
-                                    // Fallback to CSS steamer if image missing
-                                    <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative mx-auto mt-10 flex items-center justify-center">
-                                        <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                            <span className="text-6xl">♨️</span>
-                                        </div>
-                                    </div>
-                                } 
-                             />
-                          </div>
-
-                          {/* 温度计 (保持在右侧) */}
-                          <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
-                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div> {/* Target Line */}
-                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
-                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
-                                {/* Glass shine */}
-                                <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
-                                {/* Tick marks */}
-                                <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[40%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[50%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[60%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[70%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[80%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[90%] w-1.5 h-px bg-gray-400"></div>
-                          </div>
-                       </div>
-                       
-                       <button 
-                         onMouseDown={handleStopSteam}
-                         onTouchStart={handleStopSteam}
-                         className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
-                       >
-                         立即出炉!
-                       </button>
-                       <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
-                    </div>
-                  )}
-
                   {cookingStep === 'FOLDING' && (
                     <div className="flex flex-col items-center justify-center w-full h-full">
                        <div 
@@ -800,7 +731,7 @@
                        >
                          {/* 强制使用生包子图片 */}
                          <SafeImage 
-                            src="./assets/folding_bun.png"
+                            src="assets/folding_bun.png"
                             alt="Raw Bun"
                             className="w-full h-full object-cover" 
                             fallbackIcon={<div className="text-6xl">⚪</div>}
@@ -817,12 +748,45 @@
                     </div>
                   )}
 
+                  {cookingStep === 'STEAMING' && (
+                    <div className="flex flex-col items-center w-full justify-center h-full">
+                       <div className="relative w-36 h-28 transform-style-3d rotate-x-[15deg]">
+                          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                 <div className="text-4xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                 <div className="text-3xl opacity-0 animate-steam absolute -left-6 top-3" style={{animationDelay: '0.8s'}}>☁️</div>
+                                 <div className="text-3xl opacity-0 animate-steam absolute left-6 top-3" style={{animationDelay: '1.6s'}}>☁️</div>
+                          </div>
+                          <div className="w-full h-full bg-gradient-to-b from-orange-100 to-orange-300 rounded-[15px] shadow-[0_15px_25px_rgba(0,0,0,0.3)] relative border-b-8 border-orange-400 animate-pump flex items-center justify-center">
+                             <div className="absolute -top-6 left-0 w-full h-12 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                <span className="text-4xl">♨️</span>
+                             </div>
+                             <div className="absolute -right-8 bottom-0 w-4 h-28 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-50">
+                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20"></div>
+                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
+                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                                <div className="absolute top-0 left-1 w-1 h-full bg-white opacity-40"></div>
+                             </div>
+                          </div>
+                       </div>
+                       
+                       <button 
+                         onMouseDown={handleStopSteam}
+                         onTouchStart={handleStopSteam}
+                         className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
+                       >
+                         立即出炉!
+                       </button>
+                       <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
+                    </div>
+                  )}
+
                 </div>
 
                 {cookingStep === 'PREP' && (
                   <div className="bg-white p-2 pb-4 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 animate-in slide-in-from-bottom duration-500 shrink-0">
                     <h4 className="text-[10px] font-bold text-gray-400 mb-1.5 uppercase text-center">点击添加食材 Ingredients</h4>
-                    <div className="grid grid-cols-4 gap-2 px-1">
+                    {/* 修改：grid-cols-4 -> grid-cols-5, gap-2 -> gap-1，让两行刚好放下10个食材 */}
+                    <div className="grid grid-cols-5 gap-1 px-1">
                       {INGREDIENTS_POOL.map((ing) => {
                         const isNeeded = currentOrder.ingredients.includes(ing.id);
                         const isAdded = worktable.includes(ing.id);
@@ -835,7 +799,8 @@
                         <button
                           key={ing.id}
                           onClick={() => handleIngredientClick(ing)}
-                          className={`flex flex-col items-center justify-center p-1 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
+                          /* 修改：p-1 -> p-0.5 减小内边距 */
+                          className={`flex flex-col items-center justify-center p-0.5 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
                              ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
                           `}
                         >
@@ -848,7 +813,8 @@
                                 fallbackIcon={<span className="text-xl">{ing.icon}</span>}
                               />
                           </div>
-                          <span className={`text-[9px] font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
+                          {/* 修改：字体稍微调小一点 text-[8px] 以适应更窄的框 */}
+                          <span className={`text-[8px] font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
                         </button>
                       )})}
                     </div>
