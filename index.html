@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>B.O.D 包栈：极速包点师</title>
     
     <!-- 1. 引入 Tailwind CSS (样式) -->
@@ -10,8 +10,47 @@
     
     <!-- 2. 引入 React 和 Babel (运行环境) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 3. 引入 Confetti 特效库 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     
-    <!-- 解决浏览器模块兼容性问题 -->
+    <!-- 4. 自定义动画样式 -->
+    <style>
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(5deg); }
+      }
+      @keyframes steam-rise {
+        0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; }
+        20% { opacity: 0.5; }
+        100% { transform: translateY(-80px) scale(2) rotate(10deg); opacity: 0; }
+      }
+      @keyframes shake-hard {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-5deg); }
+        75% { transform: rotate(5deg); }
+      }
+      @keyframes pop-in {
+        0% { transform: scale(0); opacity: 0; }
+        80% { transform: scale(1.1); opacity: 1; }
+        100% { transform: scale(1); }
+      }
+      /* 3D 蒸笼呼吸效果 */
+      @keyframes steam-pump {
+        0%, 100% { transform: scaleY(1); }
+        50% { transform: scaleY(1.02); }
+      }
+
+      .animate-float { animation: float 6s ease-in-out infinite; }
+      .animate-steam { animation: steam-rise 2.5s ease-out infinite; }
+      .animate-shake-hard { animation: shake-hard 0.5s ease-in-out infinite; }
+      .animate-pop { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+      .animate-pump { animation: steam-pump 1s ease-in-out infinite; }
+      
+      /* 禁止触摸操作引发的默认行为，防止双击缩放 */
+      body { touch-action: manipulation; }
+    </style>
+    
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.7.0/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
@@ -23,14 +62,14 @@
     }
     </script>
 </head>
-<body class="bg-neutral-900">
+<body class="bg-neutral-900 overscroll-none">
     <div id="root"></div>
 
-    <!-- 3. 游戏核心代码 -->
+    <!-- 5. 游戏核心代码 -->
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles } from 'lucide-react';
         
         // --- Firebase 导入 ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -73,7 +112,6 @@
         }
 
         // --- 排行榜逻辑 ---
-        
         const getLeaderboard = async () => {
           if (isOnline && db) {
             try {
@@ -92,7 +130,6 @@
 
         const saveScoreToLeaderboard = async (name, score) => {
           const newEntry = { name, score, date: new Date().toISOString() };
-          
           if (isOnline && db) {
             try {
                 await addDoc(collection(db, "leaderboard"), newEntry);
@@ -110,8 +147,7 @@
         };
 
 
-        // --- B.O.D 真实产品配方 (在此处添加图片链接) ---
-        // 使用方法：将 image: "" 替换为 image: "./images/xxx.jpg"
+        // --- B.O.D 真实产品配方 ---
         const RECIPES = [
           {
             id: 'kungfu_bun',
@@ -120,7 +156,7 @@
             ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
             color: 'bg-orange-100',
             icon: '🥋',
-            image: "", // <--- 在这里填入图片链接
+            image: "", 
             difficulty: 2
           },
           {
@@ -165,7 +201,7 @@
           }
         ];
 
-        // --- 对应食材库 (在此处添加图片链接) ---
+        // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
           { id: '面团', name: '老面面团', icon: '⚪', image: "" },
           { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "" },
@@ -192,6 +228,7 @@
           const [isScoreSaved, setIsScoreSaved] = useState(false);
           const [leaderboardData, setLeaderboardData] = useState([]);
           const [isLoadingRank, setIsLoadingRank] = useState(false);
+          const [isFoldClicking, setIsFoldClicking] = useState(false);
 
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
@@ -272,6 +309,10 @@
               showFeedback('⚠️ 请先拿面团！', 'warning');
               return;
             }
+            if (ing.id !== '面团' && worktable.includes(ing.id)) {
+                 showFeedback('⚠️ 已经加过了！', 'warning');
+                 return;
+            }
 
             const newWorktable = [...worktable, ing.id];
             setWorktable(newWorktable);
@@ -287,6 +328,10 @@
 
           const handleFold = () => {
             if (cookingStep !== 'FOLDING') return;
+            
+            setIsFoldClicking(true);
+            setTimeout(() => setIsFoldClicking(false), 100);
+
             const increment = 15; 
             const newProgress = foldProgress + increment;
             
@@ -325,6 +370,13 @@
 
           const handleSteamResult = (success, msg) => {
             if (success) {
+              confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#ef4444', '#eab308', '#ffffff'] 
+              });
+
               const points = 100 + Math.floor(timeLeft / 10);
               setScore(prev => prev + points);
               showFeedback(msg, 'success');
@@ -353,35 +405,53 @@
             return 'bg-yellow-500';
           };
 
+          const getStepInstruction = () => {
+              if (!currentOrder) return '';
+              
+              if (worktable.length === 0) {
+                  return "第一步：请先取面团 ⚪";
+              }
+              
+              const added = worktable;
+              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
+              
+              if (missing.length > 0) {
+                  return `还需要：${missing.join(' + ')}`;
+              }
+              return "准备捏褶！";
+          };
+
           // --- 界面渲染 ---
 
           if (gameState === 'MENU') {
             return (
               <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-4 font-sans text-white relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                     <div className="absolute top-10 left-10 text-9xl">🥟</div>
-                     <div className="absolute bottom-20 right-10 text-9xl">♨️</div>
+                     <div className="absolute top-10 left-10 text-9xl animate-float" style={{animationDelay: '0s'}}>🥟</div>
+                     <div className="absolute bottom-20 right-10 text-9xl animate-float" style={{animationDelay: '3s'}}>♨️</div>
+                     <div className="absolute top-1/3 right-1/4 text-8xl animate-float" style={{animationDelay: '1.5s'}}>🥢</div>
                 </div>
 
-                <div className="bg-red-700 p-8 rounded-3xl shadow-2xl border-4 border-yellow-500 text-center max-w-md w-full z-10">
+                <div className="bg-red-700 p-8 rounded-3xl shadow-2xl border-4 border-yellow-500 text-center max-w-md w-full z-10 animate-pop">
                   <div className="mb-6 flex justify-center">
-                    <div className="bg-white p-4 rounded-full shadow-lg">
-                       <ChefHat size={64} className="text-red-700" />
+                    <div className="bg-white p-4 rounded-full shadow-lg relative">
+                       <ChefHat size={64} className="text-red-700 relative z-10" />
+                       <div className="absolute inset-0 bg-yellow-400 rounded-full blur-lg opacity-50 animate-pulse"></div>
                     </div>
                   </div>
-                  <h1 className="text-4xl font-bold mb-2 text-white">B.O.D 包栈</h1>
+                  <h1 className="text-4xl font-bold mb-2 text-white drop-shadow-md">B.O.D 包栈</h1>
                   <h2 className="text-2xl font-bold mb-6 text-yellow-300">极速包点师</h2>
                   
                   <div className="flex flex-col gap-3">
                     <button 
                       onClick={startGame}
-                      className="w-full bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-4 px-8 rounded-xl text-xl transition-transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                      className="w-full bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-4 px-8 rounded-xl text-xl transition-all hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center gap-2 group"
                     >
-                      <Utensils /> 开始制作
+                      <Utensils className="group-hover:rotate-12 transition-transform"/> 开始制作
                     </button>
                     <button 
                       onClick={() => setGameState('LEADERBOARD')}
-                      className="w-full bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-8 rounded-xl text-lg transition-transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 border border-red-600"
+                      className="w-full bg-red-800 hover:bg-red-900 text-white font-bold py-3 px-8 rounded-xl text-lg transition-all hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center gap-2 border border-red-600"
                     >
                       <Trophy size={20} /> 查看排行榜
                     </button>
@@ -395,9 +465,9 @@
           if (gameState === 'LEADERBOARD') {
             return (
               <div className="min-h-screen bg-neutral-900 flex flex-col items-center p-4 text-white overflow-y-auto">
-                 <div className="w-full max-w-md mt-8">
+                 <div className="w-full max-w-md mt-8 animate-pop">
                    <div className="flex items-center justify-between mb-6">
-                      <button onClick={() => setGameState('MENU')} className="bg-neutral-800 p-2 rounded-full hover:bg-neutral-700"><ArrowLeft /></button>
+                      <button onClick={() => setGameState('MENU')} className="bg-neutral-800 p-2 rounded-full hover:bg-neutral-700 transition-colors"><ArrowLeft /></button>
                       <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2"><Trophy className="text-yellow-400" /> 包点大师榜</h2>
                       <div className="w-10"></div>
                    </div>
@@ -427,7 +497,7 @@
                           {leaderboardData.map((entry, index) => (
                             <div key={index} className={`grid grid-cols-12 items-center p-4 border-b text-center ${index < 3 ? 'bg-yellow-50' : ''}`}>
                               <div className="col-span-2 font-bold flex justify-center">
-                                {index === 0 && <Crown size={20} className="text-yellow-500" fill="currentColor" />}
+                                {index === 0 && <Crown size={20} className="text-yellow-500 animate-bounce" fill="currentColor" />}
                                 {index === 1 && <Crown size={20} className="text-gray-400" fill="currentColor" />}
                                 {index === 2 && <Crown size={20} className="text-orange-400" fill="currentColor" />}
                                 {index > 2 && <span className="text-gray-500 text-sm">#{index + 1}</span>}
@@ -451,8 +521,11 @@
           if (gameState === 'GAMEOVER') {
             return (
               <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-4 text-white">
-                <div className="bg-white text-neutral-900 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-8 border-red-600">
-                  <Trophy size={64} className="mx-auto text-yellow-500 mb-4" />
+                <div className="bg-white text-neutral-900 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-8 border-red-600 animate-pop">
+                  <div className="relative inline-block">
+                      <Trophy size={64} className="mx-auto text-yellow-500 mb-4" />
+                      {score > 500 && <Sparkles className="absolute -top-2 -right-4 text-yellow-400 animate-pulse" />}
+                  </div>
                   <h2 className="text-3xl font-bold mb-2">营业结束</h2>
                   <p className="text-gray-600 mb-6">本次得分</p>
                   
@@ -471,21 +544,21 @@
                               value={playerName}
                               onChange={(e) => setPlayerName(e.target.value)}
                               placeholder="您的名字"
-                              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold"
+                              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold transition-all focus:ring-2 focus:ring-red-200"
                               maxLength={10}
                            />
                          </div>
                          <button 
                             onClick={handleSaveScore}
                             disabled={isLoadingRank}
-                            className={`bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-xl flex items-center ${isLoadingRank ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-xl flex items-center transition-all active:scale-95 ${isLoadingRank ? 'opacity-50 cursor-not-allowed' : ''}`}
                          >
                             {isLoadingRank ? '...' : '保存'}
                          </button>
                        </div>
                     </div>
                   ) : (
-                    <div className="mb-8 p-3 bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2">
+                    <div className="mb-8 p-3 bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2 animate-in fade-in">
                       <CheckCircle size={20} /> 成绩已上传
                     </div>
                   )}
@@ -493,13 +566,13 @@
                   <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => setGameState('LEADERBOARD')}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
                     >
                       <Trophy size={18}/> 排行榜
                     </button>
                     <button 
                       onClick={startGame}
-                      className="bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      className="bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
                     >
                       <RotateCcw size={18}/> 再玩一次
                     </button>
@@ -507,7 +580,7 @@
                   
                   <button 
                     onClick={() => setGameState('MENU')}
-                    className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm font-medium py-2"
+                    className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm font-medium py-2 transition-colors"
                   >
                     返回主菜单
                   </button>
@@ -522,38 +595,54 @@
 
           return (
             <div className="min-h-screen bg-gray-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl overflow-hidden relative">
-              <div className="bg-red-700 text-white p-3 flex justify-between items-center shadow-md z-10">
-                <div className="flex items-center gap-2 font-bold text-xl">
-                  <div className="bg-red-800 p-1.5 rounded-lg"><Timer size={20}/></div>
-                  <span className={`${timeLeft < 10 ? 'text-yellow-300 animate-pulse' : ''}`}>{timeLeft}s</span>
+              {/* 顶部栏 - 紧凑型 */}
+              <div className={`text-white px-3 py-2 flex flex-col shadow-md z-10 transition-colors duration-500 ${timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700'}`}>
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 font-bold text-lg">
+                    <div className={`p-1 rounded-lg transition-colors ${timeLeft < 10 ? 'bg-red-900' : 'bg-red-800'}`}><Timer size={18}/></div>
+                    <span className={`${timeLeft < 10 ? 'text-yellow-300 scale-110 font-black' : ''} transition-all`}>{timeLeft}s</span>
+                    </div>
+                    <div className="font-black text-xl text-yellow-400 flex items-center gap-1">
+                    {score} <span className="text-xs text-yellow-200 font-normal">分</span>
+                    </div>
                 </div>
-                <div className="font-black text-2xl text-yellow-400">
-                   {score} 分
+                {/* 进度条 */}
+                <div className="w-full h-1.5 bg-black/20 mt-1 rounded-full overflow-hidden">
+                    <div
+                        className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 10 ? 'bg-yellow-400' : 'bg-yellow-300'}`}
+                        style={{ width: `${(timeLeft / GAME_DURATION) * 100}%` }}
+                    ></div>
                 </div>
               </div>
 
-              <div className="bg-white p-4 border-b border-gray-200">
-                <div className="flex items-start gap-4">
-                  {/* --- 订单图片显示逻辑 --- */}
-                  <div className="w-20 h-20 bg-orange-100 rounded-lg flex items-center justify-center text-4xl shadow-inner border border-orange-200 overflow-hidden">
+              {/* 订单显示区 - 更紧凑 */}
+              <div className="bg-white p-2 border-b border-gray-200 relative z-0 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 min-w-[4rem] bg-orange-100 rounded-lg flex items-center justify-center text-3xl shadow-inner border border-orange-200 overflow-hidden relative group">
                     {currentOrder.image ? (
-                        <img src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-cover" />
+                        <img src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                     ) : (
-                        currentOrder.icon
+                        <span className="block">{currentOrder.icon}</span>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-red-600 uppercase tracking-wider">当前订单 New Order</span>
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex justify-between items-center mb-0.5">
+                        <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-1">{currentOrder.name}</h3>
-                    <p className="text-xs text-gray-500 mb-2">{currentOrder.description}</p>
+                    <h3 className="text-lg font-bold text-gray-800 mb-1 truncate leading-tight">{currentOrder.name}</h3>
+                    
                     <div className="flex flex-wrap gap-1">
-                      {currentOrder.ingredients.map((ing, idx) => (
-                        <span key={idx} className={`text-xs px-2 py-0.5 rounded-full border ${worktable.includes(ing) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                          {ing}
-                        </span>
-                      ))}
+                      {currentOrder.ingredients.map((ingName, idx) => {
+                         const isCollected = worktable.includes(ingName);
+                         const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
+                         return (
+                            <div key={idx} className={`relative flex items-center gap-1 px-1.5 py-0.5 rounded border ${isCollected ? 'bg-green-100 border-green-500 text-green-800' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
+                               <span className="text-xs">{ingData?.icon}</span>
+                               <span className="text-[10px] font-bold">{ingName}</span>
+                               {isCollected && <CheckCircle size={10} className="absolute -top-1 -right-1 bg-white text-green-500 rounded-full" />}
+                            </div>
+                         );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -568,97 +657,131 @@
                   </div>
                 )}
 
-                <div className="flex-1 flex flex-col items-center justify-center p-6 transition-all">
+                <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px]">
                   
                   {cookingStep === 'PREP' && (
-                    <div className="relative w-64 h-64 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center">
-                      {worktable.length === 0 && <span className="text-gray-300 font-bold">点击下方食材<br/>开始制作</span>}
-                      {/* --- 工作台食材显示逻辑 --- */}
-                      {worktable.includes('面团') && <div className="absolute w-56 h-56 bg-orange-50 rounded-full border border-orange-100 shadow-inner"></div>}
-                      {worktable.slice(1).map((ing, i) => {
-                          const ingredient = INGREDIENTS_POOL.find(p => p.id === ing);
-                          return (
-                            <div key={i} className="absolute text-4xl animate-in zoom-in duration-300 flex items-center justify-center" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
-                              {ingredient?.image ? (
-                                  <img src={ingredient.image} className="w-12 h-12 object-contain drop-shadow-md" />
-                              ) : (
-                                  ingredient?.icon
-                              )}
-                            </div>
-                          );
-                      })}
+                    <div className="relative w-full flex flex-col items-center justify-evenly h-full">
+                        {/* 静态步骤提示文字 */}
+                        <div className="bg-white/80 backdrop-blur px-4 py-1.5 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">
+                           {getStepInstruction()}
+                        </div>
+
+                        <div className="relative w-56 h-56 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
+                        {/* --- 工作台食材显示逻辑 --- */}
+                        {worktable.includes('面团') && <div className="absolute w-48 h-48 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
+                        {worktable.slice(1).map((ing, i) => {
+                            const ingredient = INGREDIENTS_POOL.find(p => p.id === ing);
+                            return (
+                                <div key={i} className="absolute text-4xl animate-pop flex items-center justify-center" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
+                                {ingredient?.image ? (
+                                    <img src={ingredient.image} className="w-10 h-10 object-contain drop-shadow-md" />
+                                ) : (
+                                    ingredient?.icon
+                                )}
+                                </div>
+                            );
+                        })}
+                        </div>
                     </div>
                   )}
 
                   {cookingStep === 'FOLDING' && (
-                    <div className="flex flex-col items-center w-full">
+                    <div className="flex flex-col items-center justify-center w-full h-full">
                        <div 
-                         className="w-56 h-56 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform relative overflow-hidden"
+                         className={`w-56 h-56 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
                          onClick={handleFold}
                        >
-                         {/* 显示当前正在制作的包子的图片(如果有)或默认图标 */}
                          {currentOrder.image ? (
                              <img src={currentOrder.image} className="w-full h-full object-cover" />
                          ) : (
-                             <div className="text-6xl animate-pulse">🥟</div>
+                             <div className="text-6xl">🥟</div>
                          )}
                          <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
+                         <div className="absolute bottom-4 text-xs font-bold text-orange-800 bg-white/50 px-2 rounded-full">
+                            {foldProgress}%
+                         </div>
                        </div>
-                       <p className="mt-6 text-gray-500 font-bold animate-pulse">疯狂点击包子进行捏褶！</p>
-                       <div className="w-64 h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                       <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm">疯狂点击包子进行捏褶！</p>
+                       <div className="w-48 h-3 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
                          <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div>
                        </div>
                     </div>
                   )}
 
                   {cookingStep === 'STEAMING' && (
-                    <div className="flex flex-col items-center w-full">
-                       <div className="w-64 h-64 bg-gray-200 rounded-3xl relative overflow-hidden border-b-8 border-gray-300 flex items-center justify-center">
-                          <Flame className={`absolute text-orange-500 opacity-20 w-full h-full animate-pulse`} />
-                          <div className="z-10 text-8xl">♨️</div>
+                    <div className="flex flex-col items-center w-full justify-center h-full">
+                       {/* 3D 蒸笼结构 */}
+                       <div className="relative w-40 h-32 transform-style-3d rotate-x-[15deg]">
                           
-                          <div className="absolute bottom-0 left-0 w-2 h-full bg-gray-300">
-                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                          {/* 蒸汽 */}
+                          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                 <div className="text-4xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                 <div className="text-3xl opacity-0 animate-steam absolute -left-6 top-3" style={{animationDelay: '0.8s'}}>☁️</div>
+                                 <div className="text-3xl opacity-0 animate-steam absolute left-6 top-3" style={{animationDelay: '1.6s'}}>☁️</div>
                           </div>
-                          
-                          <div className="absolute bottom-[80%] left-0 w-full h-0.5 bg-green-500 z-20"></div>
-                          <div className="absolute bottom-[100%] left-0 w-full h-0.5 bg-red-500 z-20"></div>
+
+                          {/* 蒸笼主体 */}
+                          <div className="w-full h-full bg-gradient-to-b from-orange-100 to-orange-300 rounded-[15px] shadow-[0_15px_25px_rgba(0,0,0,0.3)] relative border-b-8 border-orange-400 animate-pump flex items-center justify-center">
+                             
+                             {/* 3D 顶部盖子面 */}
+                             <div className="absolute -top-6 left-0 w-full h-12 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                <span className="text-5xl">♨️</span>
+                             </div>
+
+                             {/* 3D 侧面温度计 */}
+                             <div className="absolute -right-10 bottom-0 w-5 h-32 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-50">
+                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20"></div>
+                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
+                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                                <div className="absolute top-0 left-1 w-1 h-full bg-white opacity-40"></div>
+                             </div>
+
+                          </div>
                        </div>
                        
                        <button 
                          onMouseDown={handleStopSteam}
                          onTouchStart={handleStopSteam}
-                         className="mt-6 bg-red-600 text-white font-bold py-4 px-12 rounded-full text-xl shadow-lg active:bg-red-700 active:scale-95 transition-all"
+                         className="mt-12 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
                        >
                          立即出炉!
                        </button>
-                       <p className="mt-2 text-xs text-gray-500">当指示条到达绿色区域时点击</p>
+                       <p className="mt-3 text-[10px] text-gray-500 font-bold">观察右侧温度计，到达<span className="text-green-600">绿色刻度线</span>时点击</p>
                     </div>
                   )}
 
                 </div>
 
                 {cookingStep === 'PREP' && (
-                  <div className="bg-white p-4 pb-8 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10">
-                    <h4 className="text-xs font-bold text-gray-400 mb-3 uppercase text-center">食材选择 Ingredients</h4>
-                    <div className="grid grid-cols-4 gap-3">
-                      {INGREDIENTS_POOL.map((ing) => (
+                  <div className="bg-white p-3 pb-6 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 animate-in slide-in-from-bottom duration-500 shrink-0">
+                    <h4 className="text-[10px] font-bold text-gray-400 mb-2 uppercase text-center">点击添加食材 Add Ingredients</h4>
+                    <div className="grid grid-cols-4 gap-2">
+                      {INGREDIENTS_POOL.map((ing) => {
+                        const isNeeded = currentOrder.ingredients.includes(ing.id);
+                        const isAdded = worktable.includes(ing.id);
+                        const isNextStepDough = worktable.length === 0 && ing.id === '面团';
+                        const isNextStepIngredient = worktable.length > 0 && isNeeded && !isAdded;
+                        
+                        const shouldHighlight = isNextStepDough || isNextStepIngredient;
+
+                        return (
                         <button
                           key={ing.id}
                           onClick={() => handleIngredientClick(ing)}
-                          className="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 active:scale-90 transition-all aspect-square overflow-hidden"
+                          className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
+                             ${shouldHighlight ? 'scale-110 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
+                          `}
                         >
-                          {/* --- 按钮图片显示逻辑 --- */}
-                          <div className="w-10 h-10 flex items-center justify-center mb-1">
+                          <div className={`w-8 h-8 flex items-center justify-center mb-0.5 transition-transform`}>
                               {ing.image ? (
                                   <img src={ing.image} alt={ing.name} className="w-full h-full object-contain" />
                               ) : (
-                                  <span className="text-2xl">{ing.icon}</span>
+                                  <span className="text-xl">{ing.icon}</span>
                               )}
                           </div>
-                          <span className="text-[10px] font-medium text-gray-600 leading-tight text-center">{ing.name}</span>
+                          <span className={`text-[9px] font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
                         </button>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 )}
