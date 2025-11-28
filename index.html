@@ -454,10 +454,7 @@
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
-                <div className="absolute top-0 left-0 w-full h-full pointer-events-none text-red-500/10 z-0">
-                     <div className="absolute top-10 left-10 text-9xl animate-float">🥟</div>
-                     <div className="absolute bottom-20 right-10 text-9xl animate-float" style={{animationDelay: '2s'}}>♨️</div>
-                </div>
+                {/* 已移除漂浮的 Emoji 装饰 */}
 
                 {/* 修复重点：
                    1. min-h-0: 允许容器在空间不足时压缩，防止溢出
