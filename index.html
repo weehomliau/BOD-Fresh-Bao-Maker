@@ -64,7 +64,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2 } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2 } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
@@ -94,9 +94,8 @@
                 const analytics = getAnalytics(app); 
                 db = getFirestore(app);
                 isOnline = true;
-                console.log("🔥 Firebase 连接成功");
             } catch (e) {
-                console.error("Firebase 初始化失败:", e);
+                console.error("Firebase Init Error:", e);
             }
         }
 
@@ -128,30 +127,34 @@
           }
         };
 
-        // --- 图片加载组件 (核心) ---
+        // --- 智能图片组件：支持 Loading 状态 ---
         const SafeImage = ({ src, alt, fallbackIcon, className }) => {
-            const [hasError, setHasError] = useState(false);
+            const [status, setStatus] = useState('loading'); 
             
-            // 如果没有图片路径，直接显示 Emoji
+            useEffect(() => {
+                if(src) setStatus('loading');
+            }, [src]);
+
             if (!src) return fallbackIcon;
 
             return (
-                <>
-                    {!hasError ? (
-                        <img 
-                            src={src} 
-                            alt={alt} 
-                            className={className} 
-                            onError={(e) => {
-                                console.warn(`图片加载失败: ${src}。请检查文件名后缀 (.jpg/.png) 是否正确。`);
-                                setHasError(true);
-                            }} 
-                        />
-                    ) : (
-                        // 显示 Emoji
-                        fallbackIcon
+                <div className={`relative ${className} flex items-center justify-center overflow-hidden`}>
+                    <img 
+                        src={src} 
+                        alt={alt} 
+                        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+                        onLoad={() => setStatus('loaded')}
+                        onError={() => setStatus('error')} 
+                    />
+                    
+                    {status === 'loading' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/50">
+                            <Loader2 className="animate-spin text-red-500" size={24} />
+                        </div>
                     )}
-                </>
+
+                    {status === 'error' && fallbackIcon}
+                </div>
             );
         };
 
@@ -428,15 +431,6 @@
             return 'bg-yellow-500';
           };
 
-          const getStepInstruction = () => {
-              if (!currentOrder) return '';
-              if (worktable.length === 0) return "先取面团 ⚪";
-              const added = worktable;
-              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
-              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
-              return "准备捏褶！";
-          };
-
           // --- 界面渲染 ---
 
           if (gameState === 'MENU') {
@@ -453,7 +447,6 @@
                     
                     {/* 封面图：包含标题 */}
                     <div className="w-full mb-8 relative">
-                        {/* 封面图路径改为 assets/cover.png */}
                         <SafeImage 
                             src="assets/cover.png" 
                             alt="B.O.D Game Cover" 
@@ -644,26 +637,29 @@
                 </div>
               </div>
 
-              <div className="bg-white p-2 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-14 h-14 min-w-[3.5rem] bg-orange-100 rounded-lg flex items-center justify-center text-3xl shadow-inner border border-orange-200 overflow-hidden relative group">
+              {/* 重点修改：放大 Target 栏位 */}
+              <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
+                <div className="flex items-center gap-4">
+                  {/* 图片变大：从 w-14 h-14 增加到 w-28 h-28 */}
+                  <div className="w-28 h-28 min-w-[7rem] bg-orange-100 rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
                     <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" fallbackIcon={currentOrder.icon} />
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-between items-center mb-0.5">
-                        <span className="text-[9px] font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
                     </div>
-                    <h3 className="text-base font-bold text-gray-800 mb-0.5 truncate leading-tight">{currentOrder.name}</h3>
+                    {/* 文字变大 */}
+                    <h3 className="text-2xl font-black text-gray-800 mb-2 truncate leading-tight">{currentOrder.name}</h3>
                     
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {currentOrder.ingredients.map((ingName, idx) => {
                          const isCollected = worktable.includes(ingName);
                          const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
                          return (
-                            <div key={idx} className={`relative flex items-center gap-1 px-1.5 py-0.5 rounded border ${isCollected ? 'bg-green-100 border-green-500 text-green-800' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
-                               <span className="text-[10px]">{ingData?.icon}</span>
-                               <span className="text-[9px] font-bold">{ingName}</span>
-                               {isCollected && <CheckCircle size={8} className="absolute -top-1 -right-1 bg-white text-green-500 rounded-full" />}
+                            <div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
+                               <span className="text-sm">{ingData?.icon}</span>
+                               <span className="text-xs font-bold">{ingName}</span>
+                               {isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 bg-white text-green-500 rounded-full" />}
                             </div>
                          );
                       })}
@@ -685,11 +681,8 @@
                   
                   {cookingStep === 'PREP' && (
                     <div className="relative w-full flex flex-col items-center justify-evenly h-full">
-                        {/* 静态步骤提示 */}
-                        <div className="bg-white/80 backdrop-blur px-4 py-1 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">
-                           {getStepInstruction()}
-                        </div>
-
+                        {/* 重点修改：移除步骤提示气泡，给 Target 栏位留空间 */}
+                        
                         <div className="relative">
                             <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
                                 {worktable.includes('面团') && <div className="absolute w-32 h-32 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
@@ -708,7 +701,7 @@
                                 })}
                             </div>
                             
-                            {/* --- 重置/垃圾桶按钮 --- */}
+                            {/* 重置按钮 */}
                             {worktable.length > 0 && (
                                 <button 
                                     onClick={handleResetWorktable}
@@ -728,7 +721,6 @@
                          className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
                          onClick={handleFold}
                        >
-                         {/* 强制使用生包子图片 */}
                          <SafeImage 
                             src="assets/folding_bun.png"
                             alt="Raw Bun"
