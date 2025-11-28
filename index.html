@@ -33,8 +33,8 @@
         100% { transform: scale(1); }
       }
       @keyframes steam-pump {
-        0%, 100% { transform: scaleY(1); }
-        50% { transform: scaleY(1.02); }
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
       }
 
       .animate-float { animation: float 6s ease-in-out infinite; }
@@ -94,8 +94,9 @@
                 const analytics = getAnalytics(app); 
                 db = getFirestore(app);
                 isOnline = true;
+                console.log("🔥 Firebase 连接成功");
             } catch (e) {
-                console.error("Firebase Init Error:", e);
+                console.error("Firebase 初始化失败:", e);
             }
         }
 
@@ -127,7 +128,7 @@
           }
         };
 
-        // --- 智能图片组件：支持 Loading 状态 ---
+        // --- 智能图片组件 ---
         const SafeImage = ({ src, alt, fallbackIcon, className }) => {
             const [status, setStatus] = useState('loading'); 
             
@@ -153,7 +154,11 @@
                         </div>
                     )}
 
-                    {status === 'error' && fallbackIcon}
+                    {status === 'error' && (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                            {fallbackIcon}
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -167,7 +172,7 @@
             ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
             color: 'bg-orange-100',
             icon: <span className="text-4xl">🥋</span>,
-            image: "assets/kungfu_bun.png", 
+            image: "./assets/kungfu_bun.png", 
             difficulty: 2
           },
           {
@@ -177,7 +182,7 @@
             ingredients: ['面团', '秘制叉烧'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🍖</span>,
-            image: "assets/bbq_bun.png",
+            image: "./assets/bbq_bun.png",
             difficulty: 1
           },
           {
@@ -187,7 +192,7 @@
             ingredients: ['面团', '咸蛋黄流沙'],
             color: 'bg-yellow-100',
             icon: <span className="text-4xl">🥚</span>,
-            image: "assets/lava_bun.png",
+            image: "./assets/lava_bun.png",
             difficulty: 1
           },
           {
@@ -197,7 +202,7 @@
             ingredients: ['面团', '梅菜'],
             color: 'bg-green-50',
             icon: <span className="text-4xl">🥬</span>,
-            image: "assets/mei_cai_bun.png",
+            image: "./assets/mei_cai_bun.png",
             difficulty: 1
           },
           {
@@ -207,7 +212,7 @@
             ingredients: ['面团', '芝士碎', '培根'],
             color: 'bg-yellow-50',
             icon: <span className="text-4xl">🧀</span>,
-            image: "assets/cheese_bun.png",
+            image: "./assets/cheese_bun.png",
             difficulty: 2
           },
           {
@@ -217,23 +222,23 @@
             ingredients: ['面团', '天津红豆沙'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🫘</span>,
-            image: "assets/red_bean_bun.png",
+            image: "./assets/red_bean_bun.png",
             difficulty: 1
           }
         ];
 
         // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
-          { id: '面团', name: '老面面团', icon: '⚪', image: "assets/dough.png" },
-          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "assets/char_siu.png" },
-          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "assets/pork.png" },
-          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "assets/cabbage.png" },
-          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
-          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
-          { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
+          { id: '面团', name: '老面面团', icon: '⚪', image: "./assets/dough.png" },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "./assets/char_siu.png" },
+          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "./assets/pork.png" },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "./assets/cabbage.png" },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "./assets/wine.png" }, 
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "./assets/salted_egg.png" },
+          { id: '梅菜', name: '梅菜', icon: '🥘', image: "./assets/mei_cai.png" },
           { id: '芝士碎', name: '起司', icon: '🧀', image: "" }, 
-          { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
-          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "assets/red_bean_paste.png" },
+          { id: '培根', name: '烟熏培根', icon: '🥓', image: "./assets/bacon.png" },
+          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "./assets/red_bean_paste.png" },
         ];
 
         function BODGame() {
@@ -431,6 +436,15 @@
             return 'bg-yellow-500';
           };
 
+          const getStepInstruction = () => {
+              if (!currentOrder) return '';
+              if (worktable.length === 0) return "先取面团 ⚪";
+              const added = worktable;
+              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
+              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
+              return "准备捏褶！";
+          };
+
           // --- 界面渲染 ---
 
           if (gameState === 'MENU') {
@@ -446,13 +460,13 @@
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop">
                     
                     {/* 封面图：包含标题 */}
-                    <div className="w-full mb-8 relative">
+                    <div className="w-full mb-8 relative aspect-[4/5]">
                         <SafeImage 
                             src="assets/cover.png" 
                             alt="B.O.D Game Cover" 
-                            className="w-full object-contain drop-shadow-2xl" 
+                            className="w-full h-full object-cover rounded-2xl drop-shadow-2xl" 
                             fallbackIcon={
-                                <div className="text-center p-8 bg-white rounded-3xl shadow-xl border-4 border-orange-200">
+                                <div className="text-center p-8 bg-white rounded-3xl shadow-xl border-4 border-orange-200 w-full h-full flex flex-col items-center justify-center">
                                     <ChefHat size={80} className="text-red-600 mx-auto mb-4" />
                                     <h1 className="text-3xl font-black text-red-800">B.O.D 包栈</h1>
                                     <p className="text-orange-600 font-bold mt-2">极速包点师</p>
@@ -637,10 +651,8 @@
                 </div>
               </div>
 
-              {/* 重点修改：放大 Target 栏位 */}
               <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
-                  {/* 图片变大：从 w-14 h-14 增加到 w-28 h-28 */}
                   <div className="w-28 h-28 min-w-[7rem] bg-orange-100 rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
                     <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" fallbackIcon={currentOrder.icon} />
                   </div>
@@ -648,7 +660,6 @@
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
                     </div>
-                    {/* 文字变大 */}
                     <h3 className="text-2xl font-black text-gray-800 mb-2 truncate leading-tight">{currentOrder.name}</h3>
                     
                     <div className="flex flex-wrap gap-1.5">
@@ -681,7 +692,6 @@
                   
                   {cookingStep === 'PREP' && (
                     <div className="relative w-full flex flex-col items-center justify-evenly h-full">
-                        {/* 重点修改：移除步骤提示气泡，给 Target 栏位留空间 */}
                         
                         <div className="relative">
                             <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
@@ -701,7 +711,6 @@
                                 })}
                             </div>
                             
-                            {/* 重置按钮 */}
                             {worktable.length > 0 && (
                                 <button 
                                     onClick={handleResetWorktable}
@@ -715,14 +724,74 @@
                     </div>
                   )}
 
+                  {cookingStep === 'STEAMING' && (
+                    <div className="flex flex-col items-center w-full justify-center h-full">
+                       {/* 蒸笼容器 */}
+                       <div className="relative w-64 h-64 flex items-center justify-center"> {/* Increased size for image */}
+                          
+                          {/* 蒸汽动画 (保持在顶部) */}
+                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                 <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                 <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
+                                 <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
+                          </div>
+
+                          {/* 蒸笼图片 */}
+                          <div className="w-full h-full relative animate-pump">
+                             <SafeImage 
+                                src="./assets/steamer.png" 
+                                alt="Steamer" 
+                                className="w-full h-full object-contain drop-shadow-xl" 
+                                fallbackIcon={
+                                    // Fallback to CSS steamer if image missing
+                                    <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative mx-auto mt-10 flex items-center justify-center">
+                                        <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                            <span className="text-6xl">♨️</span>
+                                        </div>
+                                    </div>
+                                } 
+                             />
+                          </div>
+
+                          {/* 温度计 (保持在右侧) */}
+                          <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
+                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div> {/* Target Line */}
+                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
+                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                                {/* Glass shine */}
+                                <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
+                                {/* Tick marks */}
+                                <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[40%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[50%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[60%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[70%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[80%] w-1.5 h-px bg-gray-400"></div>
+                                <div className="absolute right-0 top-[90%] w-1.5 h-px bg-gray-400"></div>
+                          </div>
+                       </div>
+                       
+                       <button 
+                         onMouseDown={handleStopSteam}
+                         onTouchStart={handleStopSteam}
+                         className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
+                       >
+                         立即出炉!
+                       </button>
+                       <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
+                    </div>
+                  )}
+
                   {cookingStep === 'FOLDING' && (
                     <div className="flex flex-col items-center justify-center w-full h-full">
                        <div 
                          className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
                          onClick={handleFold}
                        >
+                         {/* 强制使用生包子图片 */}
                          <SafeImage 
-                            src="assets/folding_bun.png"
+                            src="./assets/folding_bun.png"
                             alt="Raw Bun"
                             className="w-full h-full object-cover" 
                             fallbackIcon={<div className="text-6xl">⚪</div>}
@@ -736,38 +805,6 @@
                        <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
                          <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div>
                        </div>
-                    </div>
-                  )}
-
-                  {cookingStep === 'STEAMING' && (
-                    <div className="flex flex-col items-center w-full justify-center h-full">
-                       <div className="relative w-36 h-28 transform-style-3d rotate-x-[15deg]">
-                          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                 <div className="text-4xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                 <div className="text-3xl opacity-0 animate-steam absolute -left-6 top-3" style={{animationDelay: '0.8s'}}>☁️</div>
-                                 <div className="text-3xl opacity-0 animate-steam absolute left-6 top-3" style={{animationDelay: '1.6s'}}>☁️</div>
-                          </div>
-                          <div className="w-full h-full bg-gradient-to-b from-orange-100 to-orange-300 rounded-[15px] shadow-[0_15px_25px_rgba(0,0,0,0.3)] relative border-b-8 border-orange-400 animate-pump flex items-center justify-center">
-                             <div className="absolute -top-6 left-0 w-full h-12 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                <span className="text-4xl">♨️</span>
-                             </div>
-                             <div className="absolute -right-8 bottom-0 w-4 h-28 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-50">
-                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20"></div>
-                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
-                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
-                                <div className="absolute top-0 left-1 w-1 h-full bg-white opacity-40"></div>
-                             </div>
-                          </div>
-                       </div>
-                       
-                       <button 
-                         onMouseDown={handleStopSteam}
-                         onTouchStart={handleStopSteam}
-                         className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
-                       >
-                         立即出炉!
-                       </button>
-                       <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
                     </div>
                   )}
 
