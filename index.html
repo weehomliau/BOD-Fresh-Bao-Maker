@@ -128,10 +128,11 @@
           }
         };
 
-        // --- 图片组件：自动处理加载失败 ---
+        // --- 图片加载组件 (核心) ---
         const SafeImage = ({ src, alt, fallbackIcon, className }) => {
             const [hasError, setHasError] = useState(false);
             
+            // 如果没有图片路径，直接显示 Emoji
             if (!src) return fallbackIcon;
 
             return (
@@ -141,16 +142,20 @@
                             src={src} 
                             alt={alt} 
                             className={className} 
-                            onError={() => setHasError(true)} 
+                            onError={() => {
+                                // 图片加载失败，切换到 Emoji
+                                setHasError(true);
+                            }} 
                         />
                     ) : (
+                        // 显示 Emoji
                         fallbackIcon
                     )}
                 </>
             );
         };
 
-        // --- B.O.D 真实产品配方 (已配置图片路径) ---
+        // --- B.O.D 真实产品配方 (带 Emoji 保底) ---
         const RECIPES = [
           {
             id: 'kungfu_bun',
@@ -159,7 +164,7 @@
             ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
             color: 'bg-orange-100',
             icon: <span className="text-4xl">🥋</span>,
-            image: "assets/kungfu_bun.png", 
+            image: "./assets/kungfu_bun.png", 
             difficulty: 2
           },
           {
@@ -169,7 +174,7 @@
             ingredients: ['面团', '秘制叉烧'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🍖</span>,
-            image: "assets/bbq_bun.png",
+            image: "./assets/bbq_bun.png",
             difficulty: 1
           },
           {
@@ -179,7 +184,7 @@
             ingredients: ['面团', '咸蛋黄流沙'],
             color: 'bg-yellow-100',
             icon: <span className="text-4xl">🥚</span>,
-            image: "assets/lava_bun.png",
+            image: "./assets/lava_bun.png",
             difficulty: 1
           },
           {
@@ -189,7 +194,7 @@
             ingredients: ['面团', '梅菜'],
             color: 'bg-green-50',
             icon: <span className="text-4xl">🥬</span>,
-            image: "assets/mei_cai_bun.png",
+            image: "./assets/mei_cai_bun.png",
             difficulty: 1
           },
           {
@@ -199,7 +204,7 @@
             ingredients: ['面团', '芝士碎', '培根'],
             color: 'bg-yellow-50',
             icon: <span className="text-4xl">🧀</span>,
-            image: "assets/cheese_pot.png",
+            image: "./assets/cheese_pot.png",
             difficulty: 2
           },
           {
@@ -209,23 +214,23 @@
             ingredients: ['面团', '天津红豆沙'],
             color: 'bg-red-50',
             icon: <span className="text-4xl">🫘</span>,
-            image: "assets/red_bean_bun.png",
+            image: "./assets/red_bean_bun.png",
             difficulty: 1
           }
         ];
 
-        // --- 对应食材库 (已配置图片路径) ---
+        // --- 对应食材库 (带 Emoji 保底) ---
         const INGREDIENTS_POOL = [
-          { id: '面团', name: '老面面团', icon: '⚪', image: "assets/dough.png" },
-          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "assets/char_siu.png" },
-          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "assets/pork.png" },
-          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "assets/cabbage.png" },
-          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
-          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
-          { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
-          { id: '芝士碎', name: '起司', icon: '🧀', image: "assets/cheese.png" },
-          { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
-          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "assets/red_bean_paste.png" },
+          { id: '面团', name: '老面面团', icon: '⚪', image: "./assets/dough.png" },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "./assets/char_siu.png" },
+          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "./assets/pork.png" },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "./assets/cabbage.png" },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "./assets/wine.png" }, 
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "./assets/salted_egg.png" },
+          { id: '梅菜', name: '梅菜', icon: '🥘', image: "./assets/mei_cai.png" },
+          { id: '芝士碎', name: '起司', icon: '🧀', image: "./assets/cheese.png" },
+          { id: '培根', name: '烟熏培根', icon: '🥓', image: "./assets/bacon.png" },
+          { id: '天津红豆沙', name: '天津红豆沙', icon: '🫘', image: "./assets/red_bean_paste.png" },
         ];
 
         function BODGame() {
@@ -320,7 +325,7 @@
 
             if (!currentOrder.ingredients.includes(ing.id)) {
               showFeedback('❌ 食材错误！', 'error');
-              setWorktable([]); // 错误惩罚：清空
+              setWorktable([]); 
               return;
             }
 
@@ -425,17 +430,10 @@
 
           const getStepInstruction = () => {
               if (!currentOrder) return '';
-              
-              if (worktable.length === 0) {
-                  return "先取面团 ⚪";
-              }
-              
+              if (worktable.length === 0) return "先取面团 ⚪";
               const added = worktable;
               const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
-              
-              if (missing.length > 0) {
-                  return `还需：${missing.join(' + ')}`;
-              }
+              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
               return "准备捏褶！";
           };
 
@@ -444,22 +442,19 @@
           if (gameState === 'MENU') {
             return (
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
-                {/* 装饰性背景：淡黄色波点 */}
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
-                {/* 浮动元素 (保留氛围) */}
                 <div className="absolute top-0 left-0 w-full h-full pointer-events-none text-red-500/10 z-0">
                      <div className="absolute top-10 left-10 text-9xl animate-float">🥟</div>
                      <div className="absolute bottom-20 right-10 text-9xl animate-float" style={{animationDelay: '2s'}}>♨️</div>
                 </div>
 
-                {/* 内容区域：图片 + 按钮 */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop">
                     
-                    {/* 封面海报图 */}
+                    {/* 封面图：包含标题 */}
                     <div className="w-full mb-8 relative">
                         <SafeImage 
-                            src="assets/cover.png" 
+                            src="./assets/cover.png" 
                             alt="B.O.D Game Cover" 
                             className="w-full object-contain drop-shadow-2xl" 
                             fallbackIcon={
@@ -467,12 +462,13 @@
                                     <ChefHat size={80} className="text-red-600 mx-auto mb-4" />
                                     <h1 className="text-3xl font-black text-red-800">B.O.D 包栈</h1>
                                     <p className="text-orange-600 font-bold mt-2">极速包点师</p>
+                                    <p className="text-xs text-gray-400 mt-4">(封面未加载: cover.png)</p>
                                 </div>
                             }
                         />
                     </div>
 
-                    {/* 按钮组 */}
+                    {/* 按钮 */}
                     <div className="w-full space-y-4 px-4">
                         <button 
                           onClick={startGame}
@@ -490,7 +486,6 @@
                     </div>
                 </div>
                 
-                {/* 底部版权 */}
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10">
                     MADE FOR B.O.D GAMES
                 </div>
@@ -631,7 +626,6 @@
 
           return (
             <div className="h-full w-full flex flex-col font-sans overflow-hidden">
-              {/* 顶部栏 - 极致紧凑 */}
               <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700'}`}>
                 <div className="flex justify-between items-center h-8">
                     <div className="flex items-center gap-2 font-bold text-base">
@@ -650,7 +644,6 @@
                 </div>
               </div>
 
-              {/* 订单显示区 - 高度缩减 */}
               <div className="bg-white p-2 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-14 h-14 min-w-[3.5rem] bg-orange-100 rounded-lg flex items-center justify-center text-3xl shadow-inner border border-orange-200 overflow-hidden relative group">
@@ -692,7 +685,6 @@
                   
                   {cookingStep === 'PREP' && (
                     <div className="relative w-full flex flex-col items-center justify-evenly h-full">
-                        {/* 静态步骤提示 */}
                         <div className="bg-white/80 backdrop-blur px-4 py-1 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">
                            {getStepInstruction()}
                         </div>
@@ -708,14 +700,13 @@
                                                 src={ingredient.image} 
                                                 alt={ingredient.name} 
                                                 className="w-8 h-8 object-contain drop-shadow-md" 
-                                                fallbackIcon={<span className="text-xl">{ingredient.icon}</span>}
+                                                fallbackIcon={<div className="w-8 h-8 flex items-center justify-center text-3xl">{ingredient.icon}</div>}
                                             />
                                         </div>
                                     );
                                 })}
                             </div>
                             
-                            {/* --- 重置/垃圾桶按钮 --- */}
                             {worktable.length > 0 && (
                                 <button 
                                     onClick={handleResetWorktable}
@@ -737,7 +728,7 @@
                        >
                          {/* 强制使用生包子图片 */}
                          <SafeImage 
-                            src="assets/folding_bun.png"
+                            src="./assets/folding_bun.png"
                             alt="Raw Bun"
                             className="w-full h-full object-cover" 
                             fallbackIcon={<div className="text-6xl">⚪</div>}
