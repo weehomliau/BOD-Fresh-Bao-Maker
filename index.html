@@ -36,12 +36,19 @@
         0%, 100% { transform: scaleY(1); }
         50% { transform: scaleY(1.02); }
       }
+      /* 连击火焰动画 */
+      @keyframes fire-pulse {
+        0% { transform: scale(1); text-shadow: 0 0 2px orange; }
+        50% { transform: scale(1.2); text-shadow: 0 0 10px red; }
+        100% { transform: scale(1); text-shadow: 0 0 2px orange; }
+      }
 
       .animate-float { animation: float 6s ease-in-out infinite; }
       .animate-steam { animation: steam-rise 2.5s ease-out infinite; }
       .animate-shake-hard { animation: shake-hard 0.5s ease-in-out infinite; }
       .animate-pop { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       .animate-pump { animation: steam-pump 1s ease-in-out infinite; }
+      .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
       
       body { touch-action: manipulation; overscroll-behavior: none; }
     </style>
@@ -64,7 +71,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2 } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
@@ -257,7 +264,9 @@
           const [isLoadingRank, setIsLoadingRank] = useState(false);
           const [isFoldClicking, setIsFoldClicking] = useState(false);
           
-          // 修复 1: 增加 steamLockedRef 防止连点
+          // 竞技性新增状态
+          const [combo, setCombo] = useState(0); // 连击数
+          
           const steamLockedRef = useRef(false);
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
@@ -298,6 +307,7 @@
 
           const startGame = () => {
             setScore(0);
+            setCombo(0); // 重置连击
             setTimeLeft(GAME_DURATION);
             generateNewOrder();
             setGameState('PLAYING');
@@ -328,13 +338,16 @@
           const handleResetWorktable = () => {
              if (worktable.length === 0) return;
              setWorktable([]);
+             setCombo(0); // 重置连击
+             showFeedback('连击中断!', 'error');
           };
 
           const handleIngredientClick = (ing) => {
             if (cookingStep !== 'PREP') return;
 
             if (!currentOrder.ingredients.includes(ing.id)) {
-              showFeedback('❌ 食材错误！', 'error');
+              showFeedback('❌ 食材错误！连击中断！', 'error');
+              setCombo(0); // 错误惩罚
               setWorktable([]); 
               return;
             }
@@ -386,11 +399,14 @@
           };
 
           const startSteaming = () => {
-            // 修复 2: 开始新一轮蒸煮时，重置锁
             steamLockedRef.current = false;
             let progress = 0;
+            
+            // 动态难度：每500分增加一点速度
+            const difficultySpeed = 2 + Math.floor(score / 500) * 0.3;
+
             steamTimerRef.current = setInterval(() => {
-              progress += 2; 
+              progress += difficultySpeed; 
               setSteamProgress(progress);
               if (progress > 120) { 
                 clearInterval(steamTimerRef.current);
@@ -400,16 +416,13 @@
           };
 
           const handleStopSteam = () => {
-            // 修复 3: 检查锁，如果已锁则直接返回
             if (steamLockedRef.current) return;
-            
-            // 立即上锁
             steamLockedRef.current = true;
             
             clearInterval(steamTimerRef.current);
             
             if (steamProgress >= 80 && steamProgress <= 100) {
-              handleSteamResult(true, '✨ 完美出炉！B.O.D 品质！');
+              handleSteamResult(true, '✨ 完美出炉！');
             } else if (steamProgress < 80) {
               handleSteamResult(false, '❄️ 还没熟！里面是生的！');
             } else {
@@ -419,12 +432,21 @@
 
           const handleSteamResult = (success, msg) => {
             if (success) {
+              // 连击计算
+              const newCombo = combo + 1;
+              setCombo(newCombo);
+
               const points = 100 + Math.floor(timeLeft / 10);
-              setScore(prev => prev + points);
-              showFeedback(msg, 'success');
+              // 连击加分：每个连击额外加 10% 分数
+              const comboBonus = Math.floor(points * (newCombo * 0.1));
+              const totalPoints = points + comboBonus;
+
+              setScore(prev => prev + totalPoints);
+              showFeedback(`${msg} +${totalPoints} (连击 x${newCombo})`, 'success');
               setTimeout(generateNewOrder, 1500);
             } else {
-              showFeedback(msg, 'error');
+              setCombo(0); // 失败清空连击
+              showFeedback(msg + ' 连击中断', 'error');
               setTimeLeft(prev => Math.max(0, prev - 5));
               setTimeout(() => {
                 setWorktable([]);
@@ -447,15 +469,6 @@
             return 'bg-yellow-500';
           };
 
-          const getStepInstruction = () => {
-              if (!currentOrder) return '';
-              if (worktable.length === 0) return "先取面团 ⚪";
-              const added = worktable;
-              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
-              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
-              return "准备捏褶！";
-          };
-
           // --- 界面渲染 ---
 
           if (gameState === 'MENU') {
@@ -463,12 +476,8 @@
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
-                {/* 修复重点：flex-1 + min-h-0 + 确保子元素有 h-full */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop min-h-0">
-                    
-                    {/* 封面图容器：flex-1 占据所有剩余空间 */}
                     <div className="w-full flex-1 min-h-0 mb-6 relative flex items-center justify-center">
-                        {/* 图片：h-full 撑满容器 */}
                         <SafeImage 
                             src="assets/cover.png" 
                             alt="B.O.D Game Cover" 
@@ -478,40 +487,30 @@
                                     <ChefHat size={80} className="text-red-600 mx-auto mb-4 shrink-0" />
                                     <h1 className="text-3xl font-black text-red-800 shrink-0">B.O.D 包栈</h1>
                                     <p className="text-orange-600 font-bold mt-2 shrink-0">极速包点师</p>
-                                    <p className="text-xs text-gray-400 mt-2">图片未加载: assets/cover.png</p>
                                 </div>
                             }
                         />
                     </div>
-
-                    {/* 按钮区域：shrink-0 防止被压缩 */}
                     <div className="w-full space-y-4 px-4 shrink-0">
-                        <button 
-                          onClick={startGame}
-                          className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 px-6 rounded-2xl text-xl shadow-[0_6px_0_#991b1b] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-3 border-2 border-red-700"
-                        >
+                        <button onClick={startGame} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 px-6 rounded-2xl text-xl shadow-[0_6px_0_#991b1b] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-3 border-2 border-red-700">
                           <Utensils className="animate-bounce" size={24} /> 开始制作
                         </button>
-                        
-                        <button 
-                          onClick={() => setGameState('LEADERBOARD')}
-                          className="w-full bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#ca8a04] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-yellow-500"
-                        >
+                        <button onClick={() => setGameState('LEADERBOARD')} className="w-full bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#ca8a04] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-yellow-500">
                           <Trophy size={20} /> 大师排行榜
                         </button>
                     </div>
                 </div>
-                
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.3</span>
+                    <span>By Weehom Liau • V0.4 (竞技版)</span>
                 </div>
               </div>
             );
           }
 
           if (gameState === 'LEADERBOARD') {
-            return (
+             {/* ...保持原有排行榜代码... */}
+             return (
               <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
                  <div className="w-full max-w-md mt-4 animate-pop flex flex-col h-full">
                    <div className="flex items-center justify-between mb-4 shrink-0">
@@ -577,9 +576,16 @@
                   <h2 className="text-2xl font-bold mb-1">营业结束</h2>
                   <p className="text-gray-500 mb-4 text-sm">本次得分</p>
                   
-                  <div className="text-5xl font-black text-red-600 mb-6 font-mono">
+                  <div className="text-5xl font-black text-red-600 mb-2 font-mono">
                     {score}
                   </div>
+                  
+                  {/* 连击结算展示 */}
+                  {combo > 1 && (
+                      <div className="text-orange-500 font-bold mb-4 flex items-center justify-center gap-1 animate-combo">
+                          <Flame size={16} /> 最大连击: {combo}
+                      </div>
+                  )}
 
                   {!isScoreSaved ? (
                     <div className="mb-6">
@@ -649,8 +655,16 @@
                         <div className={`p-0.5 rounded-lg transition-colors ${timeLeft < 10 ? 'bg-red-900' : 'bg-red-800'}`}><Timer size={16}/></div>
                         <span className={`${timeLeft < 10 ? 'text-yellow-300 scale-110 font-black' : ''} transition-all`}>{timeLeft}s</span>
                     </div>
-                    <div className="font-black text-lg text-yellow-400 flex items-center gap-1">
-                        {score} <span className="text-[10px] text-yellow-200 font-normal">分</span>
+                    <div className="flex items-center gap-4">
+                        {/* 连击显示 */}
+                        {combo > 1 && (
+                            <div className="font-bold text-yellow-300 flex items-center gap-1 animate-combo text-sm">
+                                <Flame size={14} className="fill-yellow-300"/> {combo} COMBO
+                            </div>
+                        )}
+                        <div className="font-black text-lg text-yellow-400 flex items-center gap-1">
+                            {score} <span className="text-[10px] text-yellow-200 font-normal">分</span>
+                        </div>
                     </div>
                 </div>
                 <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
@@ -661,21 +675,18 @@
                 </div>
               </div>
 
+              {/* 订单显示区 */}
               <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
-                  {/* 修改：恢复了 bg-orange-100, border, shadow-inner 样式 */}
                   <div className="w-28 h-28 min-w-[7rem] bg-orange-100 rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
-                    {/* 修改：恢复了 object-contain 和 drop-shadow */}
                     <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
                   </div>
-                  {/* 修复：移除了 overflow-hidden，允许 CheckCircle 溢出显示 */}
                   <div className="flex-1 min-w-0"> 
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
                     </div>
                     <h3 className="text-2xl font-black text-gray-800 mb-2 truncate leading-tight">{currentOrder.name}</h3>
                     
-                    {/* 修复：添加 pl-1 确保左边第一个元素的 scaling 边框不被切掉 */}
                     <div className="flex flex-wrap gap-1.5 pl-1">
                       {currentOrder.ingredients.map((ingName, idx) => {
                          const isCollected = worktable.includes(ingName);
@@ -684,7 +695,6 @@
                             <div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
                                <span className="text-sm">{ingData?.icon}</span>
                                <span className="text-xs font-bold">{ingName}</span>
-                               {/* 修正：去掉了 CheckCircle 的 bg-white，解决了遮挡问题 */}
                                {isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full bg-green-100" />}
                             </div>
                          );
@@ -704,7 +714,7 @@
                 )}
 
                 <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px] h-full min-h-[300px]">
-                  
+                  {/* 烹饪区逻辑保持不变... */}
                   {cookingStep === 'PREP' && (
                     <div className="relative w-full flex flex-col items-center justify-evenly h-full">
                         
@@ -726,7 +736,6 @@
                                 })}
                             </div>
                             
-                            {/* --- 重置/垃圾桶按钮 --- */}
                             {worktable.length > 0 && (
                                 <button 
                                     onClick={handleResetWorktable}
@@ -746,7 +755,6 @@
                          className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
                          onClick={handleFold}
                        >
-                         {/* 强制使用生包子图片 */}
                          <SafeImage 
                             src="assets/folding_bun.png"
                             alt="Raw Bun"
@@ -767,23 +775,18 @@
 
                   {cookingStep === 'STEAMING' && (
                     <div className="flex flex-col items-center w-full justify-center h-full">
-                       <div className="relative w-64 h-64 flex items-center justify-center"> {/* Increased size for image */}
-                          
-                          {/* 蒸汽动画 (保持在顶部) */}
+                       <div className="relative w-64 h-64 flex items-center justify-center">
                           <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
                                  <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
                                  <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
                                  <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
                           </div>
-
-                          {/* 蒸笼图片 */}
                           <div className="w-full h-full relative animate-pump">
                              <SafeImage 
                                 src="./assets/steamer.png" 
                                 alt="Steamer" 
                                 className="w-full h-full object-contain drop-shadow-xl" 
                                 fallbackIcon={
-                                    // 移除了 CSS 蒸笼的 margin-top，防止错位
                                     <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
                                         <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
                                             <span className="text-6xl">♨️</span>
@@ -792,15 +795,11 @@
                                 } 
                              />
                           </div>
-
-                          {/* 温度计 (保持在右侧) */}
                           <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
-                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div> {/* Target Line */}
+                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
                                 <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
                                 <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
-                                {/* Glass shine */}
                                 <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
-                                {/* Tick marks */}
                                 <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
                                 <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
                                 <div className="absolute right-0 top-[40%] w-1.5 h-px bg-gray-400"></div>
@@ -828,7 +827,6 @@
                 {cookingStep === 'PREP' && (
                   <div className="bg-white p-2 pb-4 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 animate-in slide-in-from-bottom duration-500 shrink-0">
                     <h4 className="text-[10px] font-bold text-gray-400 mb-1.5 uppercase text-center">点击添加食材 Ingredients</h4>
-                    {/* 修正：恢复 5 列布局，确保10个食材排2行 */}
                     <div className="grid grid-cols-5 gap-2 px-1">
                       {INGREDIENTS_POOL.map((ing) => {
                         const isNeeded = currentOrder.ingredients.includes(ing.id);
@@ -848,7 +846,7 @@
                         >
                           <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
                               <SafeImage 
-                                key={ing.image} // 强制刷新
+                                key={ing.image} 
                                 src={ing.image} 
                                 alt={ing.name} 
                                 className="w-full h-full object-contain" 
