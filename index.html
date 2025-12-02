@@ -985,31 +985,32 @@
                           )}
 
                           {cookingStep === 'STEAMING' && (
-                            <div className="flex flex-col items-center w-full justify-center h-full">
-                               <div className="relative w-64 h-64 flex items-center justify-center">
-                                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                         <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                         <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
-                                         <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
-                                  </div>
-                                  <div className="w-full h-full relative animate-pump">
-                                     <SafeImage 
-                                        src="./assets/steamer.png" 
-                                        alt="Steamer" 
-                                        className="w-full h-full object-contain drop-shadow-xl" 
-                                        fallbackIcon={
-                                            <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
-                                                <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                                    <span className="text-6xl">♨️</span>
-                                                </div>
-                                            </div>
-                                        } 
-                                     />
-                                  </div>
-                                  <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
-                                        <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
-                                        <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
-                                        <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                    <div className="flex flex-col items-center w-full justify-center h-full">
+                       <div className="relative w-64 h-64 flex items-center justify-center">
+                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                 <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                 <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
+                                 <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
+                          </div>
+                          <div className="w-full h-full relative animate-pump">
+                             <SafeImage 
+                                src="./assets/steamer.png" 
+                                alt="Steamer" 
+                                /* 修改：移除了 drop-shadow-xl，解决延迟读取时的视觉问题 */
+                                className="w-full h-full object-contain" 
+                                fallbackIcon={
+                                    <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
+                                        <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                            <span className="text-6xl">♨️</span>
+                                        </div>
+                                    </div>
+                                } 
+                             />
+                          </div>
+                          <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
+                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
+                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
+                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
                                         <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
                                         <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
                                         <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
