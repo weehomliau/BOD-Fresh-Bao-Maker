@@ -36,11 +36,15 @@
         0%, 100% { transform: scaleY(1); }
         50% { transform: scaleY(1.02); }
       }
-      /* 连击火焰动画 */
       @keyframes fire-pulse {
         0% { transform: scale(1); text-shadow: 0 0 2px orange; }
         50% { transform: scale(1.2); text-shadow: 0 0 10px red; }
         100% { transform: scale(1); text-shadow: 0 0 2px orange; }
+      }
+      @keyframes fever-bg {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
       }
 
       .animate-float { animation: float 6s ease-in-out infinite; }
@@ -49,6 +53,10 @@
       .animate-pop { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       .animate-pump { animation: steam-pump 1s ease-in-out infinite; }
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
+      .animate-fever-bg { 
+          background-size: 200% 200%;
+          animation: fever-bg 1s ease infinite; 
+      }
       
       body { touch-action: manipulation; overscroll-behavior: none; }
     </style>
@@ -71,13 +79,14 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
         import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
         const GAME_DURATION = 90; 
+        const FEVER_DURATION = 5000; 
 
         // ==========================================
         // ▼▼▼ FIREBASE 配置 ▼▼▼
@@ -236,16 +245,16 @@
 
         // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
-          { id: '面团', name: '老面面团', icon: '⚪', image: "./assets/dough.png" },
-          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "./assets/char_siu.png" },
-          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "./assets/pork.png" },
-          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "./assets/cabbage.png" },
-          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "./assets/wine.png" }, 
-          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "./assets/salted_egg.png" },
-          { id: '梅菜', name: '梅菜', icon: '🥘', image: "./assets/mei_cai.png" },
+          { id: '面团', name: '老面面团', icon: '⚪', image: "assets/dough.png" },
+          { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "assets/char_siu.png" },
+          { id: '猪肉片', name: '上等肉片', icon: '🥩', image: "assets/pork.png" },
+          { id: '包菜', name: '新鲜包菜', icon: '🥬', image: "assets/cabbage.png" },
+          { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
+          { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
+          { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
           { id: '芝士碎', name: '起司', icon: '🧀', image: "" }, 
-          { id: '培根', name: '烟熏培根', icon: '🥓', image: "./assets/bacon.png" },
-          { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "./assets/red_bean_paste.png" },
+          { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
+          { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "assets/red_bean_paste.png" },
         ];
 
         function BODGame() {
@@ -264,15 +273,78 @@
           const [isLoadingRank, setIsLoadingRank] = useState(false);
           const [isFoldClicking, setIsFoldClicking] = useState(false);
           
-          // 竞技性新增状态
-          const [combo, setCombo] = useState(0); // 连击数
+          const [combo, setCombo] = useState(0); 
+          const [isFever, setIsFever] = useState(false);
+          const [feverClickAnim, setFeverClickAnim] = useState(null); 
           
+          // --- 音频系统状态 ---
+          const [isMuted, setIsMuted] = useState(false);
+          // BGM 使用 ref 避免重渲染
+          const bgmRef = useRef(null); 
+          // 音效池
+          const sfxRefs = useRef({});
+
           const steamLockedRef = useRef(false);
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
 
+          // --- 初始化音频 ---
           useEffect(() => {
-            if (gameState === 'PLAYING') {
+              bgmRef.current = new Audio('./assets/bgm.mp3');
+              bgmRef.current.loop = true;
+              bgmRef.current.volume = 0.5;
+
+              sfxRefs.current = {
+                  pop: new Audio('./assets/pop.mp3'),
+                  win: new Audio('./assets/win.mp3'),
+                  lose: new Audio('./assets/lose.mp3'),
+              };
+              
+              // 预加载
+              Object.values(sfxRefs.current).forEach(audio => audio.load());
+
+              return () => {
+                  if (bgmRef.current) {
+                      bgmRef.current.pause();
+                      bgmRef.current = null;
+                  }
+              };
+          }, []);
+
+          // --- BGM 控制逻辑 ---
+          useEffect(() => {
+              if (!bgmRef.current) return;
+
+              if (isMuted) {
+                  bgmRef.current.pause();
+              } else {
+                  // 只有在游戏中才播放 BGM
+                  if (gameState === 'PLAYING') {
+                      // 解决浏览器自动播放策略限制：尝试播放，失败则忽略
+                      const playPromise = bgmRef.current.play();
+                      if (playPromise !== undefined) {
+                          playPromise.catch(error => console.log("Audio autoplay prevented"));
+                      }
+                      // FEVER 模式加速
+                      bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
+                  } else {
+                      bgmRef.current.pause();
+                      bgmRef.current.currentTime = 0;
+                  }
+              }
+          }, [gameState, isMuted, isFever]);
+
+          // --- 音效播放辅助函数 ---
+          const playSfx = (name) => {
+              if (isMuted || !sfxRefs.current[name]) return;
+              // 允许重叠播放：克隆节点或重置时间
+              const sound = sfxRefs.current[name];
+              sound.currentTime = 0;
+              sound.play().catch(() => {});
+          };
+
+          useEffect(() => {
+            if (gameState === 'PLAYING' && !isFever) {
               timerRef.current = setInterval(() => {
                 setTimeLeft((prev) => {
                   if (prev <= 1) {
@@ -284,7 +356,7 @@
               }, 1000);
             }
             return () => clearInterval(timerRef.current);
-          }, [gameState]);
+          }, [gameState, isFever]);
 
           useEffect(() => {
             if (gameState === 'LEADERBOARD') {
@@ -305,9 +377,30 @@
             setSteamProgress(0);
           };
 
+          const startFeverMode = () => {
+             setIsFever(true);
+             showFeedback('🔥 FEVER TIME! 时间暂停!', 'success');
+             // BGM 会在 useEffect 中自动加速
+             
+             setTimeout(() => {
+                 setIsFever(false);
+                 setTimeLeft(prev => prev + 5); 
+                 showFeedback('⏱️ 时间 +5秒!', 'success');
+                 generateNewOrder(); 
+             }, FEVER_DURATION);
+          };
+
+          const handleFeverClick = (side) => {
+              playSfx('pop'); // 播放音效
+              setScore(prev => prev + 1);
+              setFeverClickAnim(side);
+              setTimeout(() => setFeverClickAnim(null), 100);
+          };
+
           const startGame = () => {
             setScore(0);
-            setCombo(0); // 重置连击
+            setCombo(0); 
+            setIsFever(false);
             setTimeLeft(GAME_DURATION);
             generateNewOrder();
             setGameState('PLAYING');
@@ -319,6 +412,7 @@
           const endGame = () => {
             clearInterval(timerRef.current);
             clearInterval(steamTimerRef.current);
+            setIsFever(false);
             setGameState('GAMEOVER');
           };
 
@@ -337,22 +431,25 @@
 
           const handleResetWorktable = () => {
              if (worktable.length === 0) return;
+             playSfx('lose'); // 播放音效
              setWorktable([]);
-             setCombo(0); // 重置连击
+             setCombo(0);
              showFeedback('连击中断!', 'error');
           };
 
           const handleIngredientClick = (ing) => {
-            if (cookingStep !== 'PREP') return;
+            if (cookingStep !== 'PREP' || isFever) return;
 
             if (!currentOrder.ingredients.includes(ing.id)) {
+              playSfx('lose'); // 播放音效
               showFeedback('❌ 食材错误！连击中断！', 'error');
-              setCombo(0); // 错误惩罚
+              setCombo(0); 
               setWorktable([]); 
               return;
             }
 
             if (worktable.length === 0 && ing.id !== '面团') {
+              playSfx('lose');
               showFeedback('⚠️ 请先拿面团！', 'warning');
               return;
             }
@@ -367,6 +464,7 @@
                  return;
             }
 
+            playSfx('pop'); // 播放音效
             const newWorktable = [...worktable, ing.id];
             setWorktable(newWorktable);
 
@@ -375,13 +473,14 @@
             
             if (JSON.stringify(needed) === JSON.stringify(current)) {
               showFeedback('✅ 食材备齐！开始捏褶！', 'success');
-              setTimeout(() => setCookingStep('FOLDING'), 500);
+              setTimeout(() => setCookingStep('FOLDING'), 150);
             }
           };
 
           const handleFold = () => {
             if (cookingStep !== 'FOLDING') return;
             
+            playSfx('pop'); // 播放音效
             setIsFoldClicking(true);
             setTimeout(() => setIsFoldClicking(false), 100);
 
@@ -401,10 +500,7 @@
           const startSteaming = () => {
             steamLockedRef.current = false;
             let progress = 0;
-            
-            // 动态难度：每500分增加一点速度
             const difficultySpeed = 2 + Math.floor(score / 500) * 0.3;
-
             steamTimerRef.current = setInterval(() => {
               progress += difficultySpeed; 
               setSteamProgress(progress);
@@ -418,7 +514,6 @@
           const handleStopSteam = () => {
             if (steamLockedRef.current) return;
             steamLockedRef.current = true;
-            
             clearInterval(steamTimerRef.current);
             
             if (steamProgress >= 80 && steamProgress <= 100) {
@@ -432,20 +527,26 @@
 
           const handleSteamResult = (success, msg) => {
             if (success) {
-              // 连击计算
+              playSfx('win'); // 播放音效
               const newCombo = combo + 1;
               setCombo(newCombo);
 
               const points = 100 + Math.floor(timeLeft / 10);
-              // 连击加分：每个连击额外加 10% 分数
               const comboBonus = Math.floor(points * (newCombo * 0.1));
               const totalPoints = points + comboBonus;
 
-              setScore(prev => prev + totalPoints);
+              const newScore = score + totalPoints;
+              setScore(newScore); 
               showFeedback(`${msg} +${totalPoints} (连击 x${newCombo})`, 'success');
-              setTimeout(generateNewOrder, 1500);
+              
+              if (newCombo > 0 && newCombo % 5 === 0) {
+                  setTimeout(startFeverMode, 500); 
+              } else {
+                  setTimeout(generateNewOrder, 600);
+              }
             } else {
-              setCombo(0); // 失败清空连击
+              playSfx('lose'); // 播放音效
+              setCombo(0); 
               showFeedback(msg + ' 连击中断', 'error');
               setTimeLeft(prev => Math.max(0, prev - 5));
               setTimeout(() => {
@@ -453,7 +554,7 @@
                 setCookingStep('PREP');
                 setFoldProgress(0);
                 setSteamProgress(0);
-              }, 1500);
+              }, 1000);
             }
           };
 
@@ -467,6 +568,16 @@
             if (feedback.type === 'error') return 'bg-red-500';
             if (feedback.type === 'success') return 'bg-green-500';
             return 'bg-yellow-500';
+          };
+
+          const getStepInstruction = () => {
+              if (isFever) return "🔥 疯狂点击下方按钮! 🔥";
+              if (!currentOrder) return '';
+              if (worktable.length === 0) return "先取面团 ⚪";
+              const added = worktable;
+              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
+              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
+              return "准备捏褶！";
           };
 
           // --- 界面渲染 ---
@@ -487,6 +598,7 @@
                                     <ChefHat size={80} className="text-red-600 mx-auto mb-4 shrink-0" />
                                     <h1 className="text-3xl font-black text-red-800 shrink-0">B.O.D 包栈</h1>
                                     <p className="text-orange-600 font-bold mt-2 shrink-0">极速包点师</p>
+                                    <p className="text-xs text-gray-400 mt-2">图片未加载: assets/cover.png</p>
                                 </div>
                             }
                         />
@@ -502,14 +614,14 @@
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.4 (竞技版)</span>
+                    <span>By Weehom Liau • V0.5 (Audio)</span>
                 </div>
               </div>
             );
           }
 
           if (gameState === 'LEADERBOARD') {
-             {/* ...保持原有排行榜代码... */}
+             {/* ... 排行榜部分保持不变 ... */}
              return (
               <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
                  <div className="w-full max-w-md mt-4 animate-pop flex flex-col h-full">
@@ -566,7 +678,8 @@
           }
 
           if (gameState === 'GAMEOVER') {
-            return (
+             {/* ... GameOver 部分保持不变 ... */}
+             return (
               <div className="h-full w-full flex flex-col items-center justify-center p-4 bg-neutral-900 text-white">
                 <div className="bg-white text-neutral-900 p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border-t-8 border-red-600 animate-pop">
                   <div className="relative inline-block">
@@ -580,7 +693,6 @@
                     {score}
                   </div>
                   
-                  {/* 连击结算展示 */}
                   {combo > 1 && (
                       <div className="text-orange-500 font-bold mb-4 flex items-center justify-center gap-1 animate-combo">
                           <Flame size={16} /> 最大连击: {combo}
@@ -648,218 +760,268 @@
           }
 
           return (
-            <div className="h-full w-full flex flex-col font-sans overflow-hidden">
-              <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700'}`}>
+            <div className={`h-full w-full flex flex-col font-sans overflow-hidden ${isFever ? 'animate-fever-bg bg-gradient-to-br from-red-600 via-yellow-500 to-red-600' : ''}`}>
+              {/* ... 顶部栏 ... */}
+              <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${isFever ? 'bg-transparent' : (timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700')}`}>
                 <div className="flex justify-between items-center h-8">
                     <div className="flex items-center gap-2 font-bold text-base">
-                        <div className={`p-0.5 rounded-lg transition-colors ${timeLeft < 10 ? 'bg-red-900' : 'bg-red-800'}`}><Timer size={16}/></div>
-                        <span className={`${timeLeft < 10 ? 'text-yellow-300 scale-110 font-black' : ''} transition-all`}>{timeLeft}s</span>
+                        {/* 音量控制按钮 */}
+                        <button 
+                            onClick={() => setIsMuted(!isMuted)} 
+                            className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                        >
+                            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                        </button>
+
+                        <div className={`p-0.5 rounded-lg transition-colors ${isFever ? 'bg-white/20' : (timeLeft < 10 ? 'bg-red-900' : 'bg-red-800')}`}><Timer size={16}/></div>
+                        <span className={`${timeLeft < 10 ? 'text-yellow-300 scale-110 font-black' : ''} transition-all flex items-center gap-1`}>
+                            {isFever ? <span className="animate-pulse"><Clock size={14}/> PAUSED</span> : `${timeLeft}s`}
+                        </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        {/* 连击显示 */}
-                        {combo > 1 && (
-                            <div className="font-bold text-yellow-300 flex items-center gap-1 animate-combo text-sm">
-                                <Flame size={14} className="fill-yellow-300"/> {combo} COMBO
-                            </div>
-                        )}
-                        <div className="font-black text-lg text-yellow-400 flex items-center gap-1">
-                            {score} <span className="text-[10px] text-yellow-200 font-normal">分</span>
-                        </div>
-                    </div>
+                    
+                    {isFever ? (
+                         <div className="font-black text-xl text-yellow-200 animate-pulse flex items-center gap-1">
+                             <Zap className="fill-yellow-200" size={20} /> FEVER MODE!
+                         </div>
+                    ) : (
+                         <div className="flex items-center gap-4">
+                             {combo > 1 && (
+                                 <div className="font-bold text-yellow-300 flex items-center gap-1 animate-combo text-sm">
+                                     <Flame size={14} className="fill-yellow-300"/> {combo}
+                                 </div>
+                             )}
+                             <div className="font-black text-lg text-yellow-400 flex items-center gap-1">
+                                 {score}
+                             </div>
+                         </div>
+                    )}
                 </div>
                 <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
                     <div
-                        className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 10 ? 'bg-yellow-400' : 'bg-yellow-300'}`}
+                        className={`h-full transition-all duration-1000 ease-linear ${isFever ? 'bg-white' : (timeLeft < 10 ? 'bg-yellow-400' : 'bg-yellow-300')}`}
                         style={{ width: `${(timeLeft / GAME_DURATION) * 100}%` }}
                     ></div>
                 </div>
               </div>
 
-              {/* 订单显示区 */}
-              <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
-                <div className="flex items-center gap-4">
-                  <div className="w-28 h-28 min-w-[7rem] bg-orange-100 rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
-                    <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
+              {/* FEVER 模式下的主界面 */}
+              {isFever ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6 animate-pop">
+                      <div className="text-white/90 text-center text-sm font-bold tracking-widest mb-2">疯狂交替点击！+1分</div>
+                      <div className="flex gap-4 w-full h-64">
+                          <button 
+                             onClick={() => handleFeverClick('left')}
+                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-all flex flex-col items-center justify-center gap-2 group ${feverClickAnim === 'left' ? 'scale-95' : ''}`}
+                          >
+                             <span className="text-6xl group-active:scale-125 transition-transform">🥟</span>
+                             <span className="text-2xl font-black text-orange-600">捏包</span>
+                          </button>
+                          <button 
+                             onClick={() => handleFeverClick('right')}
+                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-all flex flex-col items-center justify-center gap-2 group ${feverClickAnim === 'right' ? 'scale-95' : ''}`}
+                          >
+                             <span className="text-6xl group-active:scale-125 transition-transform">♨️</span>
+                             <span className="text-2xl font-black text-red-600">蒸包</span>
+                          </button>
+                      </div>
+                      <div className="text-4xl font-black text-yellow-300 drop-shadow-lg animate-bounce">
+                          SCORE: {score}
+                      </div>
                   </div>
-                  <div className="flex-1 min-w-0"> 
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-red-600 uppercase tracking-wider">目标 Target</span>
-                    </div>
-                    <h3 className="text-2xl font-black text-gray-800 mb-2 truncate leading-tight">{currentOrder.name}</h3>
-                    
-                    <div className="flex flex-wrap gap-1.5 pl-1">
-                      {currentOrder.ingredients.map((ingName, idx) => {
-                         const isCollected = worktable.includes(ingName);
-                         const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
-                         return (
-                            <div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
-                               <span className="text-sm">{ingData?.icon}</span>
-                               <span className="text-xs font-bold">{ingName}</span>
-                               {isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full bg-green-100" />}
+              ) : (
+                  <>
+                      {/* ... 正常的订单显示区 和 操作区 (保持原样) ... */}
+                      {/* (为了节省篇幅，这里省略了中间没有改动的 JSX，实际文件请保留) */}
+                      <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
+                        <div className="flex items-center gap-4">
+                          <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group bg-orange-100">
+                            <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
+                          </div>
+                          <div className="flex-1 min-w-0"> 
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">订单 Order</span>
                             </div>
-                         );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-1 bg-neutral-100 relative overflow-y-auto flex flex-col">
-                
-                {feedback && (
-                  <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold flex items-center gap-2 animate-bounce ${getFeedbackColor()}`}>
-                    {feedback.type === 'success' ? <CheckCircle size={20}/> : <XCircle size={20}/>}
-                    {feedback.msg}
-                  </div>
-                )}
-
-                <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px] h-full min-h-[300px]">
-                  {/* 烹饪区逻辑保持不变... */}
-                  {cookingStep === 'PREP' && (
-                    <div className="relative w-full flex flex-col items-center justify-evenly h-full">
-                        
-                        <div className="relative">
-                            <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
-                                {worktable.includes('面团') && <div className="absolute w-32 h-32 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
-                                {worktable.slice(1).map((ing, i) => {
-                                    const ingredient = INGREDIENTS_POOL.find(p => p.id === ing);
-                                    return (
-                                        <div key={i} className="absolute text-3xl animate-pop flex items-center justify-center" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
-                                            <SafeImage 
-                                                src={ingredient.image} 
-                                                alt={ingredient.name} 
-                                                className="w-8 h-8 object-contain drop-shadow-md" 
-                                                fallbackIcon={<span className="text-xl">{ingredient.icon}</span>}
-                                            />
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                            <h3 className="text-2xl font-black text-gray-800 mb-2 truncate leading-tight">{currentOrder.name}</h3>
                             
-                            {worktable.length > 0 && (
-                                <button 
-                                    onClick={handleResetWorktable}
-                                    className="absolute -right-4 -top-2 bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-full border-2 border-red-200 shadow-md transition-all active:scale-90"
-                                    title="清空工作台"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                  )}
-
-                  {cookingStep === 'FOLDING' && (
-                    <div className="flex flex-col items-center justify-center w-full h-full">
-                       <div 
-                         className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
-                         onClick={handleFold}
-                       >
-                         <SafeImage 
-                            src="assets/folding_bun.png"
-                            alt="Raw Bun"
-                            className="w-full h-full object-cover" 
-                            fallbackIcon={<div className="text-6xl">⚪</div>}
-                         />
-                         <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
-                         <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full">
-                            {foldProgress}%
-                         </div>
-                       </div>
-                       <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm">疯狂点击包子！</p>
-                       <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
-                         <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div>
-                       </div>
-                    </div>
-                  )}
-
-                  {cookingStep === 'STEAMING' && (
-                    <div className="flex flex-col items-center w-full justify-center h-full">
-                       <div className="relative w-64 h-64 flex items-center justify-center">
-                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                 <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                 <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
-                                 <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
-                          </div>
-                          <div className="w-full h-full relative animate-pump">
-                             <SafeImage 
-                                src="./assets/steamer.png" 
-                                alt="Steamer" 
-                                className="w-full h-full object-contain drop-shadow-xl" 
-                                fallbackIcon={
-                                    <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
-                                        <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                            <span className="text-6xl">♨️</span>
-                                        </div>
+                            <div className="flex flex-wrap gap-1.5 pl-1">
+                              {currentOrder.ingredients.map((ingName, idx) => {
+                                 const isCollected = worktable.includes(ingName);
+                                 const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
+                                 return (
+                                    <div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}>
+                                       <span className="text-sm">{ingData?.icon}</span>
+                                       <span className="text-xs font-bold">{ingName}</span>
+                                       {isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full" />}
                                     </div>
-                                } 
-                             />
+                                 );
+                              })}
+                            </div>
                           </div>
-                          <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
-                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
-                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
-                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
-                                <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
-                                <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[40%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[50%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[60%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[70%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[80%] w-1.5 h-px bg-gray-400"></div>
-                                <div className="absolute right-0 top-[90%] w-1.5 h-px bg-gray-400"></div>
-                          </div>
-                       </div>
-                       
-                       <button 
-                         onMouseDown={handleStopSteam}
-                         onTouchStart={handleStopSteam}
-                         className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
-                       >
-                         立即出炉!
-                       </button>
-                       <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
-                    </div>
-                  )}
+                        </div>
+                      </div>
 
-                </div>
-
-                {cookingStep === 'PREP' && (
-                  <div className="bg-white p-2 pb-4 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 animate-in slide-in-from-bottom duration-500 shrink-0">
-                    <h4 className="text-[10px] font-bold text-gray-400 mb-1.5 uppercase text-center">点击添加食材 Ingredients</h4>
-                    <div className="grid grid-cols-5 gap-2 px-1">
-                      {INGREDIENTS_POOL.map((ing) => {
-                        const isNeeded = currentOrder.ingredients.includes(ing.id);
-                        const isAdded = worktable.includes(ing.id);
-                        const isNextStepDough = worktable.length === 0 && ing.id === '面团';
-                        const isNextStepIngredient = worktable.length > 0 && isNeeded && !isAdded;
+                      <div className="flex-1 bg-neutral-100 relative overflow-y-auto flex flex-col">
                         
-                        const shouldHighlight = isNextStepDough || isNextStepIngredient;
-
-                        return (
-                        <button
-                          key={ing.id}
-                          onClick={() => handleIngredientClick(ing)}
-                          className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
-                             ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
-                          `}
-                        >
-                          <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
-                              <SafeImage 
-                                key={ing.image} 
-                                src={ing.image} 
-                                alt={ing.name} 
-                                className="w-full h-full object-contain" 
-                                fallbackIcon={<span className="text-3xl">{ing.icon}</span>}
-                              />
+                        {feedback && (
+                          <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold flex items-center gap-2 animate-bounce ${getFeedbackColor()}`}>
+                            {feedback.type === 'success' ? <CheckCircle size={20}/> : <XCircle size={20}/>}
+                            {feedback.msg}
                           </div>
-                          <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
-                        </button>
-                      )})}
-                    </div>
-                  </div>
-                )}
-              </div>
+                        )}
+
+                        <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px] h-full min-h-[300px]">
+                          
+                          {cookingStep === 'PREP' && (
+                            <div className="relative w-full flex flex-col items-center justify-evenly h-full">
+                                <div className="bg-white/80 backdrop-blur px-4 py-1 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">
+                                   {getStepInstruction()}
+                                </div>
+
+                                <div className="relative">
+                                    <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
+                                        {worktable.includes('面团') && <div className="absolute w-32 h-32 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
+                                        {worktable.slice(1).map((ing, i) => {
+                                            const ingredient = INGREDIENTS_POOL.find(p => p.id === ing);
+                                            return (
+                                                <div key={i} className="absolute text-3xl animate-pop flex items-center justify-center" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
+                                                    <SafeImage 
+                                                        src={ingredient.image} 
+                                                        alt={ingredient.name} 
+                                                        className="w-8 h-8 object-contain drop-shadow-md" 
+                                                        fallbackIcon={<span className="text-xl">{ingredient.icon}</span>}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    
+                                    {worktable.length > 0 && (
+                                        <button 
+                                            onClick={handleResetWorktable}
+                                            className="absolute -right-4 -top-2 bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-full border-2 border-red-200 shadow-md transition-all active:scale-90"
+                                            title="清空工作台"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                          )}
+
+                          {/* ... FOLDING & STEAMING logic ... */}
+                          {cookingStep === 'FOLDING' && (
+                            <div className="flex flex-col items-center justify-center w-full h-full">
+                               <div 
+                                 className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
+                                 onClick={handleFold}
+                               >
+                                 <SafeImage 
+                                    src="assets/folding_bun.png"
+                                    alt="Raw Bun"
+                                    className="w-full h-full object-cover" 
+                                    fallbackIcon={<div className="text-6xl">⚪</div>}
+                                 />
+                                 <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
+                                 <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full">
+                                    {foldProgress}%
+                                 </div>
+                               </div>
+                               <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm">疯狂点击包子！</p>
+                               <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
+                                 <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div>
+                               </div>
+                            </div>
+                          )}
+
+                          {cookingStep === 'STEAMING' && (
+                            <div className="flex flex-col items-center w-full justify-center h-full">
+                               <div className="relative w-64 h-64 flex items-center justify-center">
+                                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                         <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                         <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
+                                         <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
+                                  </div>
+                                  <div className="w-full h-full relative animate-pump">
+                                     <SafeImage 
+                                        src="./assets/steamer.png" 
+                                        alt="Steamer" 
+                                        className="w-full h-full object-contain drop-shadow-xl" 
+                                        fallbackIcon={
+                                            <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
+                                                <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                                    <span className="text-6xl">♨️</span>
+                                                </div>
+                                            </div>
+                                        } 
+                                     />
+                                  </div>
+                                  <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
+                                        <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
+                                        <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
+                                        <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                                        <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
+                                        <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[40%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[50%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[60%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[70%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[80%] w-1.5 h-px bg-gray-400"></div>
+                                        <div className="absolute right-0 top-[90%] w-1.5 h-px bg-gray-400"></div>
+                                  </div>
+                               </div>
+                               
+                               <button 
+                                 onMouseDown={handleStopSteam}
+                                 onTouchStart={handleStopSteam}
+                                 className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
+                               >
+                                 立即出炉!
+                               </button>
+                               <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
+                            </div>
+                          )}
+
+                        </div>
+
+                        {cookingStep === 'PREP' && (
+                          <div className="bg-white p-2 pb-4 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-10 animate-in slide-in-from-bottom duration-500 shrink-0">
+                            <h4 className="text-[10px] font-bold text-gray-400 mb-1.5 uppercase text-center">点击添加食材 Ingredients</h4>
+                            <div className="grid grid-cols-5 gap-2 px-1">
+                              {INGREDIENTS_POOL.map((ing) => {
+                                const isNeeded = currentOrder.ingredients.includes(ing.id);
+                                const isAdded = worktable.includes(ing.id);
+                                const isNextStepDough = worktable.length === 0 && ing.id === '面团';
+                                const isNextStepIngredient = worktable.length > 0 && isNeeded && !isAdded;
+                                
+                                const shouldHighlight = isNextStepDough || isNextStepIngredient;
+
+                                return (
+                                <button
+                                  key={ing.id}
+                                  onClick={() => handleIngredientClick(ing)}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
+                                     ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
+                                  `}
+                                >
+                                  <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
+                                      <SafeImage 
+                                        key={ing.image} 
+                                        src={ing.image} 
+                                        alt={ing.name} 
+                                        className="w-full h-full object-contain" 
+                                        fallbackIcon={<span className="text-3xl">{ing.icon}</span>}
+                                      />
+                                  </div>
+                                  <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
+                                </button>
+                              )})}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                  </>
+              )}
             </div>
           );
         }
