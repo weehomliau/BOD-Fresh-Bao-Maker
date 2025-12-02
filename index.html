@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>B.O.D 包栈：极速包点师</title>
     
-    <!-- PWA 配置 -->
     <link rel="icon" type="image/png" href="assets/cover.png">
     <link rel="apple-touch-icon" href="assets/cover.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b91c1c">
     
-    <!-- 1. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. 引入 React 和 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 3. 样式定义 -->
     <style>
       @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
       @keyframes steam-rise { 0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; } 20% { opacity: 0.5; } 100% { transform: translateY(-60px) scale(1.5) rotate(10deg); opacity: 0; } }
@@ -36,7 +31,7 @@
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
       .animate-fever-bg { background-size: 200% 200%; animation: fever-bg 1s ease infinite; }
       
-      /* 性能优化：硬件加速 */
+      /* 优化：开启硬件加速，减少卡顿 */
       .gpu-accel { transform: translateZ(0); will-change: transform; }
       
       body { touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -58,7 +53,7 @@
     <div id="root" class="w-full max-w-md h-[100dvh] bg-gray-100 sm:rounded-3xl shadow-2xl relative flex flex-col"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
+        import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare } from 'lucide-react';
         
@@ -88,7 +83,6 @@
                 const analytics = getAnalytics(app); 
                 db = getFirestore(app);
                 isOnline = true;
-                console.log("🔥 Firebase 连接成功");
             } catch (e) {
                 console.error("Firebase Init Error:", e);
             }
@@ -122,7 +116,7 @@
           }
         };
 
-        // --- 性能优化：SafeImage 使用 memo 防止不必要的重绘 ---
+        // --- 优化：使用 memo 的图片组件 ---
         const SafeImage = memo(({ src, alt, fallbackIcon, className }) => {
             const [status, setStatus] = useState('loading'); 
             useEffect(() => { if(src) setStatus('loading'); }, [src]);
@@ -142,27 +136,50 @@
             );
         });
 
-        // --- 性能优化：独立食材按钮组件，减少主循环重绘影响 ---
-        const IngredientBtn = memo(({ ing, isNeeded, isAdded, isNextStepDough, isNextStepIngredient, onClick }) => {
-            const shouldHighlight = isNextStepDough || isNextStepIngredient;
+        // --- 关键优化：独立的捏褶组件 (FoldingStage) ---
+        // 只有这个组件会在点击时重绘，不影响全局
+        const FoldingStage = memo(({ onComplete, playSfx, targetImage }) => {
+            const [progress, setProgress] = useState(0);
+
+            const handlePointerDown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 音效
+                playSfx('pop');
+                
+                // 进度更新
+                setProgress(prev => {
+                    const next = prev + 15;
+                    if (next >= 100) {
+                        // 延迟一点通知完成，避免视觉突变太快
+                        requestAnimationFrame(() => onComplete());
+                        return 100;
+                    }
+                    return next;
+                });
+            };
+
             return (
-                <button
-                  onClick={() => onClick(ing)}
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-75 aspect-square overflow-hidden group relative btn-press
-                     ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
-                  `}
-                >
-                  <div className={`w-12 h-12 flex items-center justify-center mb-1`}>
-                      <SafeImage 
-                        key={ing.image} 
-                        src={ing.image} 
-                        alt={ing.name} 
-                        className="w-full h-full object-contain" 
-                        fallbackIcon={<span className="text-3xl">{ing.icon}</span>}
-                      />
-                  </div>
-                  <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
-                </button>
+                <div className="flex flex-col items-center justify-center w-full h-full">
+                   <div 
+                     className="w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer relative overflow-hidden btn-press gpu-accel"
+                     onPointerDown={handlePointerDown}
+                   >
+                     <SafeImage 
+                        src="assets/folding_bun.png"
+                        alt="Raw Bun"
+                        className="w-full h-full object-cover pointer-events-none" 
+                        fallbackIcon={<div className="text-6xl">⚪</div>}
+                     />
+                     <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" style={{ clipPath: `polygon(50% 50%, ${100-progress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
+                     <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full pointer-events-none">
+                        {progress}%
+                     </div>
+                   </div>
+                   <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm pointer-events-none">疯狂点击包子！</p>
+                   <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-yellow-500 transition-all duration-75" style={{ width: `${progress}%` }}></div></div>
+                </div>
             );
         });
 
@@ -195,7 +212,8 @@
           const [currentOrder, setCurrentOrder] = useState(null);
           const [worktable, setWorktable] = useState([]); 
           const [cookingStep, setCookingStep] = useState('PREP'); 
-          const [foldProgress, setFoldProgress] = useState(0); 
+          // 移除了 foldProgress 状态，交给子组件管理
+          
           const [steamProgress, setSteamProgress] = useState(0); 
           const [feedback, setFeedback] = useState(null); 
           const [playerName, setPlayerName] = useState('');
@@ -205,8 +223,8 @@
           
           const [combo, setCombo] = useState(0); 
           const [isFever, setIsFever] = useState(false);
+          const [feverClickAnim, setFeverClickAnim] = useState(null); 
           
-          // PWA
           const [deferredPrompt, setDeferredPrompt] = useState(null);
           const [showInstallModal, setShowInstallModal] = useState(false);
           const [isIOS, setIsIOS] = useState(false);
@@ -214,8 +232,6 @@
           const [isMuted, setIsMuted] = useState(false);
           const bgmRef = useRef(null); 
           const victoryBgmRef = useRef(null); 
-          
-          // 性能优化：音频池
           const sfxPools = useRef({});
 
           const steamLockedRef = useRef(false);
@@ -240,7 +256,6 @@
               victoryBgmRef.current.loop = true;
               victoryBgmRef.current.volume = 0.4;
 
-              // 初始化音频池：为每个高频音效创建多个实例
               const createPool = (src, size) => Array.from({length: size}, () => {
                   const a = new Audio(src);
                   a.load();
@@ -248,7 +263,7 @@
               });
 
               sfxPools.current = {
-                  pop: createPool('assets/pop.mp3', 10), // 10个实例，保证极速连点不断音
+                  pop: createPool('assets/pop.mp3', 10),
                   win: createPool('assets/win.mp3', 10),
                   lose: createPool('assets/lose.mp3', 3),
               };
@@ -298,18 +313,14 @@
               }
           }, [gameState, isMuted, isFever]);
 
-          // --- 性能优化：音频池播放逻辑 ---
-          const playSfx = (name) => {
+          const playSfx = useCallback((name) => {
               if (isMuted || !sfxPools.current[name]) return;
-              
               const pool = sfxPools.current[name];
-              // 找到一个没在播放的音频，或者强制使用第一个
               const sound = pool.find(s => s.paused) || pool[0];
-              
               sound.currentTime = 0;
               sound.volume = 1.0;
               sound.play().catch(() => {});
-          };
+          }, [isMuted]);
 
           useEffect(() => {
             if (gameState === 'PLAYING' && !isFever) {
@@ -341,7 +352,6 @@
             setCurrentOrder(randomRecipe);
             setWorktable([]);
             setCookingStep('PREP');
-            setFoldProgress(0);
             setSteamProgress(0);
           };
 
@@ -360,7 +370,8 @@
               if(e) { e.preventDefault(); e.stopPropagation(); }
               playSfx('win'); 
               setScore(prev => prev + 1);
-              // 移除 JS 动画，纯 CSS 处理
+              setFeverClickAnim(side);
+              setTimeout(() => setFeverClickAnim(null), 50); 
           };
 
           const startGame = () => {
@@ -409,19 +420,25 @@
             if (!currentOrder.ingredients.includes(ing.id)) {
               playSfx('lose'); 
               showFeedback('❌ 食材错误！连击中断！', 'error');
-              setCombo(0); setWorktable([]); return;
+              setCombo(0); 
+              setWorktable([]); 
+              return;
             }
 
             if (worktable.length === 0 && ing.id !== '面团') {
-              playSfx('lose'); showFeedback('⚠️ 请先拿面团！', 'warning'); return;
+              playSfx('lose');
+              showFeedback('⚠️ 请先拿面团！', 'warning');
+              return;
             }
             
             if (ing.id === '面团' && worktable.includes('面团')) {
-                showFeedback('⚠️ 已经有面团了！', 'warning'); return;
+                showFeedback('⚠️ 已经有面团了！', 'warning');
+                return;
             }
             
             if (ing.id !== '面团' && worktable.includes(ing.id)) {
-                 showFeedback('⚠️ 已经加过了！', 'warning'); return;
+                 showFeedback('⚠️ 已经加过了！', 'warning');
+                 return;
             }
 
             playSfx('pop'); 
@@ -433,24 +450,17 @@
             
             if (JSON.stringify(needed) === JSON.stringify(current)) {
               showFeedback('✅ 食材备齐！开始捏褶！', 'success');
+              // 秒进转场
               setTimeout(() => setCookingStep('FOLDING'), 150);
             }
           };
 
-          const handleFold = () => {
-            if (cookingStep !== 'FOLDING') return;
-            playSfx('pop'); 
-            const increment = 15; 
-            const newProgress = foldProgress + increment;
-            if (newProgress >= 100) {
-              setFoldProgress(100);
-              setCookingStep('STEAMING');
-              showFeedback('🥟 造型完美！放入蒸笼！', 'success');
-              startSteaming();
-            } else {
-              setFoldProgress(newProgress);
-            }
-          };
+          // --- 捏包完成回调 ---
+          const handleFoldComplete = useCallback(() => {
+            setCookingStep('STEAMING');
+            showFeedback('🥟 造型完美！放入蒸笼！', 'success');
+            startSteaming();
+          }, []);
 
           const startSteaming = () => {
             steamLockedRef.current = false;
@@ -470,6 +480,7 @@
             if (steamLockedRef.current) return;
             steamLockedRef.current = true;
             clearInterval(steamTimerRef.current);
+            
             if (steamProgress >= 80 && steamProgress <= 100) {
               handleSteamResult(true, '✨ 完美出炉！');
             } else if (steamProgress < 80) {
@@ -484,12 +495,15 @@
               playSfx('win'); 
               const newCombo = combo + 1;
               setCombo(newCombo);
+
               const points = 100 + Math.floor(timeLeft / 10);
               const comboBonus = Math.floor(points * (newCombo * 0.1));
               const totalPoints = points + comboBonus;
+
               const newScore = score + totalPoints;
               setScore(newScore); 
               showFeedback(`${msg} +${totalPoints} (连击 x${newCombo})`, 'success');
+              
               if (newCombo > 0 && newCombo % 5 === 0) {
                   setTimeout(startFeverMode, 500); 
               } else {
@@ -503,7 +517,6 @@
               setTimeout(() => {
                 setWorktable([]);
                 setCookingStep('PREP');
-                setFoldProgress(0);
                 setSteamProgress(0);
               }, 1000);
             }
@@ -521,17 +534,8 @@
             return 'bg-yellow-500';
           };
 
-          const getStepInstruction = () => {
-              if (isFever) return "🔥 疯狂点击下方按钮! 🔥";
-              if (!currentOrder) return '';
-              if (worktable.length === 0) return "先取面团 ⚪";
-              const added = worktable;
-              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
-              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
-              return "准备捏褶！";
-          };
-
           // --- 界面渲染 ---
+
           if (gameState === 'MENU') {
             return (
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
@@ -567,9 +571,9 @@
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.15 (高性能版)</span>
+                    <span>By Weehom Liau • V0.16 (零卡顿重构)</span>
                 </div>
-
+                
                 {showInstallModal && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setShowInstallModal(false)}>
                         <div className="bg-white rounded-3xl p-6 max-w-xs w-full relative shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}>
@@ -662,9 +666,8 @@
                             <div className="flex flex-wrap gap-1.5 pl-1">
                               {currentOrder.ingredients.map((ingName, idx) => {
                                  const isCollected = worktable.includes(ingName);
-                                 // Find the ingredient object to pass image to SafeImage
                                  const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
-                                 return (<div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}><span className="text-sm w-4 h-4 flex items-center justify-center"><SafeImage src={ingData?.image} alt={ingName} className="w-full h-full object-contain" fallbackIcon={ingData?.icon}/></span><span className="text-xs font-bold">{ingName}</span>{isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full" />}</div>);
+                                 return (<div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}><span className="text-sm">{ingData?.icon}</span><span className="text-xs font-bold">{ingName}</span>{isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full bg-green-100" />}</div>);
                               })}
                             </div>
                           </div>
@@ -689,16 +692,9 @@
                             </div>
                           )}
 
+                          {/* 使用分离的 FoldingStage 组件 */}
                           {cookingStep === 'FOLDING' && (
-                            <div className="flex flex-col items-center justify-center w-full h-full">
-                               <div className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform duration-75 active:scale-90 relative overflow-hidden btn-press gpu-accel`} onPointerDown={handleFold}>
-                                 <SafeImage src="assets/folding_bun.png" alt="Raw Bun" className="w-full h-full object-cover" fallbackIcon={<div className="text-6xl">⚪</div>} />
-                                 <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
-                                 <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full">{foldProgress}%</div>
-                               </div>
-                               <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm">疯狂点击包子！</p>
-                               <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div></div>
-                            </div>
+                             <FoldingStage onComplete={handleFoldComplete} playSfx={playSfx} targetImage={currentOrder.image} />
                           )}
 
                           {cookingStep === 'STEAMING' && (
@@ -745,16 +741,18 @@
                                 const shouldHighlight = isNextStepDough || isNextStepIngredient;
 
                                 return (
-                                    <IngredientBtn 
-                                        key={ing.id} 
-                                        ing={ing} 
-                                        isNeeded={isNeeded} 
-                                        isAdded={isAdded} 
-                                        isNextStepDough={isNextStepDough} 
-                                        isNextStepIngredient={isNextStepIngredient} 
-                                        onClick={handleIngredientClick}
-                                    />
-                                )})}
+                                    <button
+                                      key={ing.id}
+                                      onClick={() => handleIngredientClick(ing)}
+                                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}`}
+                                    >
+                                      <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
+                                          <SafeImage key={ing.image} src={ing.image} alt={ing.name} className="w-full h-full object-contain" fallbackIcon={<span className="text-3xl">{ing.icon}</span>} />
+                                      </div>
+                                      <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
+                                    </button>
+                                )
+                              })}
                             </div>
                           </div>
                         )}
@@ -770,3 +768,5 @@
     </script>
 </body>
 </html>
+
+
