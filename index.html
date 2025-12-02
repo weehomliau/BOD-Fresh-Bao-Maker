@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>B.O.D 包栈：极速包点师</title>
     
-    <!-- PWA 配置 -->
     <link rel="icon" type="image/png" href="assets/cover.png">
     <link rel="apple-touch-icon" href="assets/cover.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b91c1c">
     
-    <!-- 1. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. 引入 React 和 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 3. 样式定义 -->
     <style>
       @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
       @keyframes steam-rise { 0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; } 20% { opacity: 0.5; } 100% { transform: translateY(-60px) scale(1.5) rotate(10deg); opacity: 0; } }
@@ -36,11 +31,17 @@
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
       .animate-fever-bg { background-size: 200% 200%; animation: fever-bg 1s ease infinite; }
       
-      /* 性能优化：硬件加速 */
-      .gpu-accel { transform: translateZ(0); will-change: transform; }
+      /* 性能优化：强制硬件加速层，解决大图卡顿 */
+      .gpu-accel { 
+          transform: translate3d(0,0,0); 
+          will-change: transform; 
+          backface-visibility: hidden;
+      }
       
       body { touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-      .btn-press:active { transform: scale(0.92) !important; transition: transform 0.05s; }
+      
+      /* 极速点击反馈 */
+      .btn-press:active { transform: scale(0.90) !important; transition: transform 0.05s cubic-bezier(0.4, 0, 1, 1); }
     </style>
     
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.7.0/dist/es-module-shims.js"></script>
@@ -122,16 +123,19 @@
           }
         };
 
-        // --- 高性能图片组件 ---
+        // --- 高性能图片组件 (Memoized) ---
         const SafeImage = memo(({ src, alt, fallbackIcon, className }) => {
             const [status, setStatus] = useState('loading'); 
             useEffect(() => { if(src) setStatus('loading'); }, [src]);
             if (!src) return fallbackIcon;
             return (
-                <div className={`relative ${className} w-full h-full flex items-center justify-center overflow-hidden`}>
+                // gpu-accel 强制使用 GPU 合成层
+                <div className={`relative ${className} w-full h-full flex items-center justify-center overflow-hidden gpu-accel`}>
                     <img 
                         src={src} 
                         alt={alt} 
+                        // loading="eager" 告诉浏览器优先加载
+                        loading="eager"
                         className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
                         onLoad={() => setStatus('loaded')}
                         onError={() => setStatus('error')} 
@@ -142,7 +146,7 @@
             );
         });
 
-        // --- 独立食材按钮组件 ---
+        // --- 独立食材按钮 ---
         const IngredientBtn = memo(({ ing, onClick, shouldHighlight }) => {
             return (
                 <button
@@ -165,7 +169,7 @@
             );
         });
 
-        // --- 独立捏褶组件 ---
+        // --- 独立捏褶组件 (极速优化版) ---
         const FoldingStage = memo(({ onComplete, playSfx }) => {
             const [progress, setProgress] = useState(0);
 
@@ -178,7 +182,7 @@
                 setProgress(prev => {
                     const next = prev + 15;
                     if (next >= 100) {
-                        // 使用微任务确保在下一次渲染前调用，避免冲突
+                        // 微任务队列处理回调，避免 React 批量更新冲突
                         setTimeout(() => onComplete(), 0);
                         return 100;
                     }
@@ -188,6 +192,7 @@
 
             return (
                 <div className="flex flex-col items-center justify-center w-full h-full">
+                   {/* 重点优化：移除了 clip-path 遮罩，改用 transform 缩放反馈，性能提升巨大 */}
                    <div 
                      className="w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer relative overflow-hidden btn-press gpu-accel"
                      onPointerDown={handlePointerDown}
@@ -198,13 +203,19 @@
                         className="w-full h-full object-cover pointer-events-none" 
                         fallbackIcon={<div className="text-6xl">⚪</div>}
                      />
-                     <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" style={{ clipPath: `polygon(50% 50%, ${100-progress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
+                     
+                     {/* 进度文字 */}
                      <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full pointer-events-none">
                         {progress}%
                      </div>
                    </div>
+                   
                    <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm pointer-events-none">疯狂点击包子！</p>
-                   <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-yellow-500 transition-all duration-75" style={{ width: `${progress}%` }}></div></div>
+                   
+                   {/* 进度条 */}
+                   <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
+                       <div className="h-full bg-yellow-500 transition-all duration-75" style={{ width: `${progress}%` }}></div>
+                   </div>
                 </div>
             );
         });
@@ -226,7 +237,7 @@
           { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
           { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
           { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
-          { id: '芝士碎', name: '起司', icon: '🧀', image: "assets/cheese.png" }, 
+          { id: '芝士碎', name: '起司', icon: '🧀', image: "" }, 
           { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
           { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "assets/red_bean_paste.png" },
         ];
@@ -247,8 +258,8 @@
           
           const [combo, setCombo] = useState(0); 
           const [isFever, setIsFever] = useState(false);
+          const [feverClickAnim, setFeverClickAnim] = useState(null); 
           
-          // PWA
           const [deferredPrompt, setDeferredPrompt] = useState(null);
           const [showInstallModal, setShowInstallModal] = useState(false);
           const [isIOS, setIsIOS] = useState(false);
@@ -376,6 +387,7 @@
             setCurrentOrder(randomRecipe);
             setWorktable([]);
             setCookingStep('PREP');
+            setFoldProgress(0);
             setSteamProgress(0);
           };
 
@@ -390,10 +402,12 @@
              }, FEVER_DURATION);
           };
 
-          const handleFeverClick = (e) => {
+          const handleFeverClick = (side, e) => {
               if(e) { e.preventDefault(); e.stopPropagation(); }
               playSfx('win'); 
               setScore(prev => prev + 1);
+              setFeverClickAnim(side);
+              setTimeout(() => setFeverClickAnim(null), 50); 
           };
 
           const startGame = () => {
@@ -436,7 +450,6 @@
              showFeedback('连击中断!', 'error');
           };
 
-          // 注意：将 handleIngredientClick 定义在 useMemo 或直接使用，确保不引用旧状态
           const handleIngredientClick = (ing) => {
             if (cookingStep !== 'PREP' || isFever) return;
             if (!currentOrder.ingredients.includes(ing.id)) {
@@ -470,12 +483,6 @@
             startSteaming();
           }, []);
 
-          // startSteaming 定义在组件作用域内，确保能访问到 score 等最新状态
-          // 注意：这里不使用 useCallback，或者必须正确添加依赖。
-          // 为防止 handleFoldComplete 闭包陷阱，我们已经在 handleFoldComplete 调用前确保函数是最新的
-          // 但更好的方式是，handleFoldComplete 不直接调用 startSteaming，而是通过 useEffect 监听 cookingStep 变化。
-          // 为了简化修复白屏，我们这里直接定义，并确保调用顺序正确。
-          
           const startSteaming = () => {
             steamLockedRef.current = false;
             let progress = 0;
@@ -494,7 +501,6 @@
             if (steamLockedRef.current) return;
             steamLockedRef.current = true;
             clearInterval(steamTimerRef.current);
-            
             if (steamProgress >= 80 && steamProgress <= 100) {
               handleSteamResult(true, '✨ 完美出炉！');
             } else if (steamProgress < 80) {
@@ -582,9 +588,19 @@
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.17 (稳定修复)</span>
+                    <span>By Weehom Liau • V0.18 (极速流畅版)</span>
                 </div>
-                {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full relative shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">知道了</button></div></div>)}
+                
+                {showInstallModal && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setShowInstallModal(false)}>
+                        <div className="bg-white rounded-3xl p-6 max-w-xs w-full relative shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+                            <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>
+                            {isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}
+                            <button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">知道了</button>
+                        </div>
+                    </div>
+                )}
               </div>
             );
           }
@@ -668,8 +684,6 @@
                               {currentOrder.ingredients.map((ingName, idx) => {
                                  const isCollected = worktable.includes(ingName);
                                  const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
-                                 const shouldHighlight = !isCollected && worktable.includes('面团') && worktable.length > 0; // Highlight missing ingredients if dough is added
-                                 
                                  return (<div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}><span className="text-sm">{ingData?.icon}</span><span className="text-xs font-bold">{ingName}</span>{isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full" />}</div>);
                               })}
                             </div>
@@ -695,7 +709,7 @@
                             </div>
                           )}
 
-                          {cookingStep === 'FOLDING' && <FoldingStage onComplete={handleFoldComplete} playSfx={playSfx} />}
+                          {cookingStep === 'FOLDING' && <FoldingStage onComplete={handleFoldComplete} playSfx={playSfx} targetImage={currentOrder.image} />}
 
                           {cookingStep === 'STEAMING' && (
                             <div className="flex flex-col items-center w-full justify-center h-full">
@@ -744,8 +758,8 @@
                                     <IngredientBtn 
                                         key={ing.id} 
                                         ing={ing} 
-                                        shouldHighlight={shouldHighlight} 
-                                        onClick={handleIngredientClick}
+                                        onClick={handleIngredientClick} 
+                                        shouldHighlight={shouldHighlight}
                                     />
                                 )})}
                             </div>
