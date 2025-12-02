@@ -2,30 +2,11 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 视口设置：禁止缩放，适配全面屏 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>B.O.D 包栈：极速包点师</title>
     
-    <!-- ========================================== -->
-    <!-- ▼▼▼ 主屏幕图标配置 (PWA) ▼▼▼ -->
-    <!-- ========================================== -->
-    
-    <!-- 1. 浏览器标签页图标 (Favicon) -->
+    <!-- 设置网页图标 (Favicon) -->
     <link rel="icon" type="image/png" href="assets/cover.png">
-    <link rel="shortcut icon" type="image/png" href="assets/cover.png">
-    
-    <!-- 2. iOS (iPhone/iPad) 主屏幕图标 -->
-    <link rel="apple-touch-icon" href="assets/cover.png">
-    <!-- 隐藏 Safari 顶栏和底栏，实现全屏体验 -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="B.O.D 包栈">
-    
-    <!-- 3. Android 主屏幕图标及颜色 -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#b91c1c"> <!-- B.O.D 红色 -->
-    
-    <!-- ========================================== -->
     
     <!-- 1. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -306,24 +287,32 @@
           const [isScoreSaved, setIsScoreSaved] = useState(false);
           const [leaderboardData, setLeaderboardData] = useState([]);
           const [isLoadingRank, setIsLoadingRank] = useState(false);
-          const [isFoldClicking, setIsFoldClicking] = useState(false);
+          // 移除 isFoldClicking 状态，改用 CSS active
           
           const [combo, setCombo] = useState(0); 
           const [isFever, setIsFever] = useState(false);
           const [feverClickAnim, setFeverClickAnim] = useState(null); 
           
+          // --- 音频系统状态 ---
           const [isMuted, setIsMuted] = useState(false);
           const bgmRef = useRef(null); 
+          const victoryBgmRef = useRef(null); // 新增胜利音乐 Ref
           const sfxRefs = useRef({});
 
           const steamLockedRef = useRef(false);
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
 
+          // --- 初始化音频 ---
           useEffect(() => {
               bgmRef.current = new Audio('./assets/bgm.mp3');
               bgmRef.current.loop = true;
               bgmRef.current.volume = 0.5;
+
+              // 初始化胜利音乐
+              victoryBgmRef.current = new Audio('./assets/victory.mp3');
+              victoryBgmRef.current.loop = true;
+              victoryBgmRef.current.volume = 0.6;
 
               sfxRefs.current = {
                   pop: new Audio('./assets/pop.mp3'),
@@ -332,30 +321,54 @@
               };
               
               Object.values(sfxRefs.current).forEach(audio => audio.load());
+              victoryBgmRef.current.load();
 
               return () => {
                   if (bgmRef.current) {
                       bgmRef.current.pause();
                       bgmRef.current = null;
                   }
+                  if (victoryBgmRef.current) {
+                      victoryBgmRef.current.pause();
+                      victoryBgmRef.current = null;
+                  }
               };
           }, []);
 
+          // --- BGM 控制逻辑 (更新) ---
           useEffect(() => {
-              if (!bgmRef.current) return;
+              if (!bgmRef.current || !victoryBgmRef.current) return;
 
               if (isMuted) {
                   bgmRef.current.pause();
+                  victoryBgmRef.current.pause();
               } else {
                   if (gameState === 'PLAYING') {
+                      // 播放游戏 BGM，停止胜利音乐
+                      victoryBgmRef.current.pause();
+                      victoryBgmRef.current.currentTime = 0;
+                      
                       const playPromise = bgmRef.current.play();
                       if (playPromise !== undefined) {
                           playPromise.catch(error => console.log("Audio autoplay prevented"));
                       }
                       bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
-                  } else {
+
+                  } else if (gameState === 'GAMEOVER') {
+                      // 播放胜利音乐，停止游戏 BGM
                       bgmRef.current.pause();
                       bgmRef.current.currentTime = 0;
+
+                      const playPromise = victoryBgmRef.current.play();
+                      if (playPromise !== undefined) {
+                          playPromise.catch(error => console.log("Audio autoplay prevented"));
+                      }
+                  } else {
+                      // 菜单或其他状态：全停
+                      bgmRef.current.pause();
+                      bgmRef.current.currentTime = 0;
+                      victoryBgmRef.current.pause();
+                      victoryBgmRef.current.currentTime = 0;
                   }
               }
           }, [gameState, isMuted, isFever]);
@@ -364,7 +377,6 @@
           const playSfx = (name) => {
               if (isMuted || !sfxRefs.current[name]) return;
               
-              // 关键：支持 "win" 和 "pop" 音效的并发播放
               if (name === 'pop' || name === 'win') {
                   const clone = sfxRefs.current[name].cloneNode();
                   clone.volume = name === 'win' ? 0.6 : 0.8; 
@@ -424,21 +436,16 @@
 
           // --- FEVER 点击处理 (极速优化版) ---
           const handleFeverClick = (side, e) => {
-              // 1. 阻止默认事件（防缩放/选中文本）
               if(e) {
                   e.preventDefault();
                   e.stopPropagation();
               }
               
-              // 2. 播放音效 (win 音效)
               playSfx('win'); 
-              
-              // 3. 更新分数
               setScore(prev => prev + 1);
               
-              // 4. 极简视觉反馈 (只触发状态变化，动画由 CSS transition 处理)
               setFeverClickAnim(side);
-              setTimeout(() => setFeverClickAnim(null), 50); // 50ms 极速复位
+              setTimeout(() => setFeverClickAnim(null), 50); 
           };
 
           const startGame = () => {
@@ -525,9 +532,7 @@
             if (cookingStep !== 'FOLDING') return;
             
             playSfx('pop'); 
-            setIsFoldClicking(true);
-            setTimeout(() => setIsFoldClicking(false), 50);
-
+            
             const increment = 15; 
             const newProgress = foldProgress + increment;
             
@@ -658,14 +663,15 @@
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.7 (连打优化)</span>
+                    <span>By Weehom Liau • V0.9 (结算音乐)</span>
                 </div>
               </div>
             );
           }
 
+          // ... (LEADERBOARD 保持不变) ...
           if (gameState === 'LEADERBOARD') {
-             // ... (LEADERBOARD 保持不变) ...
+             // ... (LEADERBOARD code) ...
              return (
               <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
                  <div className="w-full max-w-md mt-4 animate-pop flex flex-col h-full">
@@ -721,8 +727,9 @@
             );
           }
 
+          // ... (GAMEOVER 保持不变) ...
           if (gameState === 'GAMEOVER') {
-             // ... (GAMEOVER 保持不变) ...
+             // ... (GAMEOVER code) ...
              return (
               <div className="h-full w-full flex flex-col items-center justify-center p-4 bg-neutral-900 text-white">
                 <div className="bg-white text-neutral-900 p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border-t-8 border-red-600 animate-pop">
@@ -805,7 +812,7 @@
 
           return (
             <div className={`h-full w-full flex flex-col font-sans overflow-hidden ${isFever ? 'animate-fever-bg bg-gradient-to-br from-red-600 via-yellow-500 to-red-600' : ''}`}>
-              {/* ... Top Bar (保持不变) ... */}
+              {/* ... Top Bar ... */}
               <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${isFever ? 'bg-transparent' : (timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700')}`}>
                 <div className="flex justify-between items-center h-8">
                     <div className="flex items-center gap-2 font-bold text-base">
@@ -848,21 +855,21 @@
                 </div>
               </div>
 
-              {/* FEVER 模式下的主界面 - 重点修改：改为 onPointerDown */}
+              {/* FEVER 模式下的主界面 - 重点修改：onPointerDown 零延迟 + CSS 动画 */}
               {isFever ? (
                   <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6 animate-pop">
                       <div className="text-white/90 text-center text-sm font-bold tracking-widest mb-2">疯狂交替点击！+1分</div>
                       <div className="flex gap-4 w-full h-64">
                           <button 
                              onPointerDown={(e) => handleFeverClick('left', e)}
-                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group ${feverClickAnim === 'left' ? 'scale-90' : ''}`}
+                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}
                           >
                              <span className="text-6xl group-active:scale-125 transition-transform">🥟</span>
                              <span className="text-2xl font-black text-orange-600">捏包</span>
                           </button>
                           <button 
                              onPointerDown={(e) => handleFeverClick('right', e)}
-                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group ${feverClickAnim === 'right' ? 'scale-90' : ''}`}
+                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}
                           >
                              <span className="text-6xl group-active:scale-125 transition-transform">♨️</span>
                              <span className="text-2xl font-black text-red-600">蒸包</span>
@@ -874,7 +881,7 @@
                   </div>
               ) : (
                   <>
-                      {/* ... 正常的订单显示区 和 操作区 (保持不变) ... */}
+                      {/* ... (NORMAL MODE) 保持不变 ... */}
                       <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                         <div className="flex items-center gap-4">
                           <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group bg-orange-100">
@@ -916,6 +923,11 @@
                           
                           {cookingStep === 'PREP' && (
                             <div className="relative w-full flex flex-col items-center justify-evenly h-full">
+                                {/* 静态步骤提示 - 移除 bounce 动画 */}
+                                {/* <div className="bg-white/80 backdrop-blur px-4 py-1 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">
+                                   {getStepInstruction()}
+                                </div> */}
+
                                 <div className="relative">
                                     <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
                                         {worktable.includes('面团') && <div className="absolute w-32 h-32 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
@@ -947,12 +959,12 @@
                             </div>
                           )}
 
-                          {/* ... FOLDING & STEAMING logic ... */}
+                          {/* 捏包环节优化：同样使用 onPointerDown + CSS active */}
                           {cookingStep === 'FOLDING' && (
                             <div className="flex flex-col items-center justify-center w-full h-full">
                                <div 
-                                 className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform relative overflow-hidden ${isFoldClicking ? 'scale-90' : 'scale-100'}`}
-                                 onClick={handleFold}
+                                 className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform duration-75 active:scale-90 relative overflow-hidden`}
+                                 onPointerDown={handleFold}
                                >
                                  <SafeImage 
                                     src="assets/folding_bun.png"
