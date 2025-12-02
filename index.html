@@ -44,7 +44,6 @@
         50% { transform: scale(1.2); text-shadow: 0 0 10px red; }
         100% { transform: scale(1); text-shadow: 0 0 2px orange; }
       }
-      /* Fever 模式特效 */
       @keyframes fever-bg {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
@@ -287,7 +286,7 @@
           const [isScoreSaved, setIsScoreSaved] = useState(false);
           const [leaderboardData, setLeaderboardData] = useState([]);
           const [isLoadingRank, setIsLoadingRank] = useState(false);
-          // 移除 isFoldClicking 状态，改用 CSS active
+          // isFoldClicking 已移除，使用 CSS active
           
           const [combo, setCombo] = useState(0); 
           const [isFever, setIsFever] = useState(false);
@@ -296,7 +295,7 @@
           // --- 音频系统状态 ---
           const [isMuted, setIsMuted] = useState(false);
           const bgmRef = useRef(null); 
-          const victoryBgmRef = useRef(null); // 新增胜利音乐 Ref
+          const victoryBgmRef = useRef(null); 
           const sfxRefs = useRef({});
 
           const steamLockedRef = useRef(false);
@@ -305,19 +304,20 @@
 
           // --- 初始化音频 ---
           useEffect(() => {
-              bgmRef.current = new Audio('./assets/bgm.mp3');
+              // 注意：这里路径统一为 assets/xxx.mp3
+              bgmRef.current = new Audio('assets/bgm.mp3');
               bgmRef.current.loop = true;
               bgmRef.current.volume = 0.5;
 
               // 初始化胜利音乐
-              victoryBgmRef.current = new Audio('./assets/victory.mp3');
+              victoryBgmRef.current = new Audio('assets/victory.mp3');
               victoryBgmRef.current.loop = true;
               victoryBgmRef.current.volume = 0.6;
 
               sfxRefs.current = {
-                  pop: new Audio('./assets/pop.mp3'),
-                  win: new Audio('./assets/win.mp3'),
-                  lose: new Audio('./assets/lose.mp3'),
+                  pop: new Audio('assets/pop.mp3'),
+                  win: new Audio('assets/win.mp3'),
+                  lose: new Audio('assets/lose.mp3'),
               };
               
               Object.values(sfxRefs.current).forEach(audio => audio.load());
@@ -350,7 +350,7 @@
                       
                       const playPromise = bgmRef.current.play();
                       if (playPromise !== undefined) {
-                          playPromise.catch(error => console.log("Audio autoplay prevented"));
+                          playPromise.catch(error => console.log("Audio autoplay prevented or BGM not found"));
                       }
                       bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
 
@@ -361,7 +361,7 @@
 
                       const playPromise = victoryBgmRef.current.play();
                       if (playPromise !== undefined) {
-                          playPromise.catch(error => console.log("Audio autoplay prevented"));
+                          playPromise.catch(error => console.error("Victory music play failed. Check if assets/victory.mp3 exists.", error));
                       }
                   } else {
                       // 菜单或其他状态：全停
@@ -373,7 +373,7 @@
               }
           }, [gameState, isMuted, isFever]);
 
-          // --- 音效播放辅助函数 (深度优化连打) ---
+          // --- 音效播放辅助函数 ---
           const playSfx = (name) => {
               if (isMuted || !sfxRefs.current[name]) return;
               
@@ -434,7 +434,7 @@
              }, FEVER_DURATION);
           };
 
-          // --- FEVER 点击处理 (极速优化版) ---
+          // --- FEVER 点击处理 ---
           const handleFeverClick = (side, e) => {
               if(e) {
                   e.preventDefault();
@@ -528,11 +528,13 @@
             }
           };
 
+          // --- 捏褶逻辑 (优化手感) ---
           const handleFold = () => {
             if (cookingStep !== 'FOLDING') return;
             
             playSfx('pop'); 
-            
+            // 移除 JS 状态动画
+
             const increment = 15; 
             const newProgress = foldProgress + increment;
             
@@ -663,15 +665,14 @@
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.9 (结算音乐)</span>
+                    <span>By Weehom Liau • V0.10 (音乐+无阴影修复)</span>
                 </div>
               </div>
             );
           }
 
-          // ... (LEADERBOARD 保持不变) ...
           if (gameState === 'LEADERBOARD') {
-             // ... (LEADERBOARD code) ...
+             {/* ... (LEADERBOARD 保持不变) ... */}
              return (
               <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
                  <div className="w-full max-w-md mt-4 animate-pop flex flex-col h-full">
@@ -727,9 +728,8 @@
             );
           }
 
-          // ... (GAMEOVER 保持不变) ...
           if (gameState === 'GAMEOVER') {
-             // ... (GAMEOVER code) ...
+             {/* ... (GAMEOVER 保持不变) ... */}
              return (
               <div className="h-full w-full flex flex-col items-center justify-center p-4 bg-neutral-900 text-white">
                 <div className="bg-white text-neutral-900 p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border-t-8 border-red-600 animate-pop">
@@ -881,7 +881,7 @@
                   </div>
               ) : (
                   <>
-                      {/* ... (NORMAL MODE) 保持不变 ... */}
+                      {/* ... (NORMAL MODE) 保持不变 - 这里使用捏包优化版逻辑 ... */}
                       <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                         <div className="flex items-center gap-4">
                           <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group bg-orange-100">
@@ -923,11 +923,6 @@
                           
                           {cookingStep === 'PREP' && (
                             <div className="relative w-full flex flex-col items-center justify-evenly h-full">
-                                {/* 静态步骤提示 - 移除 bounce 动画 */}
-                                {/* <div className="bg-white/80 backdrop-blur px-4 py-1 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">
-                                   {getStepInstruction()}
-                                </div> */}
-
                                 <div className="relative">
                                     <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0">
                                         {worktable.includes('面团') && <div className="absolute w-32 h-32 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
@@ -985,32 +980,31 @@
                           )}
 
                           {cookingStep === 'STEAMING' && (
-                    <div className="flex flex-col items-center w-full justify-center h-full">
-                       <div className="relative w-64 h-64 flex items-center justify-center">
-                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                 <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                 <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
-                                 <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
-                          </div>
-                          <div className="w-full h-full relative animate-pump">
-                             <SafeImage 
-                                src="./assets/steamer.png" 
-                                alt="Steamer" 
-                                /* 修改：移除了 drop-shadow-xl，解决延迟读取时的视觉问题 */
-                                className="w-full h-full object-contain" 
-                                fallbackIcon={
-                                    <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
-                                        <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                            <span className="text-6xl">♨️</span>
-                                        </div>
-                                    </div>
-                                } 
-                             />
-                          </div>
-                          <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
-                                <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
-                                <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
-                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
+                            <div className="flex flex-col items-center w-full justify-center h-full">
+                               <div className="relative w-64 h-64 flex items-center justify-center">
+                                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
+                                         <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                         <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
+                                         <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
+                                  </div>
+                                  <div className="w-full h-full relative animate-pump">
+                                     <SafeImage 
+                                        src="./assets/steamer.png" 
+                                        alt="Steamer" 
+                                        className="w-full h-full object-contain drop-shadow-xl" 
+                                        fallbackIcon={
+                                            <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
+                                                <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
+                                                    <span className="text-6xl">♨️</span>
+                                                </div>
+                                            </div>
+                                        } 
+                                     />
+                                  </div>
+                                  <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
+                                        <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
+                                        <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
+                                        <div className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-red-500 transition-all duration-75" style={{ height: `${steamProgress}%` }}></div>
                                         <div className="absolute top-0 left-1 w-1.5 h-full bg-white opacity-30 rounded-full"></div>
                                         <div className="absolute right-0 top-[10%] w-1.5 h-px bg-gray-400"></div>
                                         <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div>
