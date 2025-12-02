@@ -2,11 +2,15 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>B.O.D 包栈：极速包点师</title>
     
-    <!-- 设置网页图标 (Favicon) -->
+    <!-- PWA 配置 -->
     <link rel="icon" type="image/png" href="assets/cover.png">
+    <link rel="apple-touch-icon" href="assets/cover.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#b91c1c">
     
     <!-- 1. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,46 +20,13 @@
 
     <!-- 3. 样式定义 -->
     <style>
-      @keyframes float {
-        0%, 100% { transform: translateY(0px) rotate(0deg); }
-        50% { transform: translateY(-10px) rotate(2deg); }
-      }
-      @keyframes steam-rise {
-        0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; }
-        20% { opacity: 0.5; }
-        100% { transform: translateY(-60px) scale(1.5) rotate(10deg); opacity: 0; }
-      }
-      @keyframes shake-hard {
-        0%, 100% { transform: rotate(0deg); }
-        25% { transform: rotate(-5deg); }
-        75% { transform: rotate(5deg); }
-      }
-      @keyframes pop-in {
-        0% { transform: scale(0); opacity: 0; }
-        80% { transform: scale(1.1); opacity: 1; }
-        100% { transform: scale(1); }
-      }
-      @keyframes steam-pump {
-        0%, 100% { transform: scaleY(1); }
-        50% { transform: scaleY(1.02); }
-      }
-      @keyframes fire-pulse {
-        0% { transform: scale(1); text-shadow: 0 0 2px orange; }
-        50% { transform: scale(1.2); text-shadow: 0 0 10px red; }
-        100% { transform: scale(1); text-shadow: 0 0 2px orange; }
-      }
-      @keyframes fever-bg {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-      @keyframes zoom-shake {
-        0% { transform: scale(1) rotate(0deg); }
-        25% { transform: scale(1.1) rotate(-2deg); }
-        50% { transform: scale(1.1) rotate(2deg); }
-        75% { transform: scale(1.1) rotate(-2deg); }
-        100% { transform: scale(1) rotate(0deg); }
-      }
+      @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+      @keyframes steam-rise { 0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; } 20% { opacity: 0.5; } 100% { transform: translateY(-60px) scale(1.5) rotate(10deg); opacity: 0; } }
+      @keyframes shake-hard { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+      @keyframes pop-in { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
+      @keyframes steam-pump { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.02); } }
+      @keyframes fire-pulse { 0% { transform: scale(1); text-shadow: 0 0 2px orange; } 50% { transform: scale(1.2); text-shadow: 0 0 10px red; } 100% { transform: scale(1); text-shadow: 0 0 2px orange; } }
+      @keyframes fever-bg { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
       .animate-float { animation: float 6s ease-in-out infinite; }
       .animate-steam { animation: steam-rise 2.5s ease-out infinite; }
@@ -63,16 +34,9 @@
       .animate-pop { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       .animate-pump { animation: steam-pump 1s ease-in-out infinite; }
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
-      .animate-fever-bg { 
-          background-size: 200% 200%;
-          animation: fever-bg 1s ease infinite; 
-      }
-      .animate-zoom-shake { animation: zoom-shake 0.2s ease-in-out; }
+      .animate-fever-bg { background-size: 200% 200%; animation: fever-bg 1s ease infinite; }
       
-      /* 关键：禁止触摸操作引发的默认行为，防止双击缩放和滚动 */
       body { touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-      
-      /* 按钮点击时的瞬时反馈 - 更快的响应 */
       .btn-press:active { transform: scale(0.92) !important; transition: transform 0.05s; }
     </style>
     
@@ -90,11 +54,10 @@
 <body class="bg-neutral-900 min-h-[100dvh] flex items-center justify-center font-sans overflow-hidden fixed inset-0">
     <div id="root" class="w-full max-w-md h-[100dvh] bg-gray-100 sm:rounded-3xl shadow-2xl relative flex flex-col"></div>
 
-    <!-- 5. 游戏核心代码 -->
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
@@ -103,9 +66,6 @@
         const GAME_DURATION = 90; 
         const FEVER_DURATION = 5000; 
 
-        // ==========================================
-        // ▼▼▼ FIREBASE 配置 ▼▼▼
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyADgrOOUC0C1fCuFyjeggJCgAPYewz6AEA",
             authDomain: "bod-fresh-bao-maker.firebaseapp.com",
@@ -127,7 +87,7 @@
                 isOnline = true;
                 console.log("🔥 Firebase 连接成功");
             } catch (e) {
-                console.error("Firebase 初始化失败:", e);
+                console.error("Firebase Init Error:", e);
             }
         }
 
@@ -159,16 +119,10 @@
           }
         };
 
-        // --- 智能图片组件 ---
         const SafeImage = ({ src, alt, fallbackIcon, className }) => {
             const [status, setStatus] = useState('loading'); 
-            
-            useEffect(() => {
-                if(src) setStatus('loading');
-            }, [src]);
-
+            useEffect(() => { if(src) setStatus('loading'); }, [src]);
             if (!src) return fallbackIcon;
-
             return (
                 <div className={`relative ${className} w-full h-full flex items-center justify-center overflow-hidden`}>
                     <img 
@@ -178,87 +132,21 @@
                         onLoad={() => setStatus('loaded')}
                         onError={() => setStatus('error')} 
                     />
-                    
-                    {status === 'loading' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/50">
-                            <Loader2 className="animate-spin text-red-500" size={24} />
-                        </div>
-                    )}
-
-                    {status === 'error' && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            {fallbackIcon}
-                        </div>
-                    )}
+                    {status === 'loading' && <div className="absolute inset-0 flex items-center justify-center bg-gray-100/50"><Loader2 className="animate-spin text-red-500" size={24} /></div>}
+                    {status === 'error' && <div className="absolute inset-0 flex items-center justify-center">{fallbackIcon}</div>}
                 </div>
             );
         };
 
-        // --- B.O.D 真实产品配方 ---
         const RECIPES = [
-          {
-            id: 'kungfu_bun',
-            name: '功夫肉包',
-            description: 'B.O.D 镇店之宝，酒香扑鼻',
-            ingredients: ['面团', '猪肉片', '包菜', '花雕酒'],
-            color: 'bg-orange-100',
-            icon: <span className="text-4xl">🥋</span>,
-            image: "assets/kungfu_bun.png", 
-            difficulty: 2
-          },
-          {
-            id: 'bbq_bun',
-            name: '御品叉烧包',
-            description: '独家秘制酱汁，肥瘦适中',
-            ingredients: ['面团', '秘制叉烧'],
-            color: 'bg-red-50',
-            icon: <span className="text-4xl">🍖</span>,
-            image: "assets/bbq_bun.png",
-            difficulty: 1
-          },
-          {
-            id: 'lava_bun',
-            name: '咸蛋流沙包',
-            description: '爆浆口感，咸甜交织',
-            ingredients: ['面团', '咸蛋黄流沙'],
-            color: 'bg-yellow-100',
-            icon: <span className="text-4xl">🥚</span>,
-            image: "assets/lava_bun.png",
-            difficulty: 1
-          },
-          {
-            id: 'mei_cai_bun',
-            name: '梅菜包',
-            description: '经典客家风味，咸香开胃',
-            ingredients: ['面团', '梅菜'],
-            color: 'bg-green-50',
-            icon: <span className="text-4xl">🥬</span>,
-            image: "assets/mei_cai_bun.png",
-            difficulty: 1
-          },
-          {
-            id: 'cheese_pot',
-            name: '香香起司窝',
-            description: '年轻人的最爱，拉丝芝士',
-            ingredients: ['面团', '芝士碎', '培根'],
-            color: 'bg-yellow-50',
-            icon: <span className="text-4xl">🧀</span>,
-            image: "assets/cheese_bun.png",
-            difficulty: 2
-          },
-          {
-            id: 'red_bean_bun',
-            name: '豆沙包',
-            description: '经典红豆，香甜细腻',
-            ingredients: ['面团', '天津红豆'],
-            color: 'bg-red-50',
-            icon: <span className="text-4xl">🫘</span>,
-            image: "./assets/red_bean_bun.png",
-            difficulty: 1
-          }
+          { id: 'kungfu_bun', name: '功夫肉包', description: 'B.O.D 镇店之宝', ingredients: ['面团', '猪肉片', '包菜', '花雕酒'], color: 'bg-orange-100', icon: <span className="text-4xl">🥋</span>, image: "assets/kungfu_bun.png", difficulty: 2 },
+          { id: 'bbq_bun', name: '御品叉烧包', description: '独家秘制酱汁', ingredients: ['面团', '秘制叉烧'], color: 'bg-red-50', icon: <span className="text-4xl">🍖</span>, image: "assets/bbq_bun.png", difficulty: 1 },
+          { id: 'lava_bun', name: '咸蛋流沙包', description: '爆浆口感', ingredients: ['面团', '咸蛋黄流沙'], color: 'bg-yellow-100', icon: <span className="text-4xl">🥚</span>, image: "assets/lava_bun.png", difficulty: 1 },
+          { id: 'mei_cai_bun', name: '梅菜包', description: '经典客家风味', ingredients: ['面团', '梅菜'], color: 'bg-green-50', icon: <span className="text-4xl">🥬</span>, image: "assets/mei_cai_bun.png", difficulty: 1 },
+          { id: 'cheese_pot', name: '香香起司窝', description: '年轻人的最爱', ingredients: ['面团', '芝士碎', '培根'], color: 'bg-yellow-50', icon: <span className="text-4xl">🧀</span>, image: "assets/cheese_bun.png", difficulty: 2 },
+          { id: 'red_bean_bun', name: '豆沙包', description: '经典红豆', ingredients: ['面团', '天津红豆'], color: 'bg-red-50', icon: <span className="text-4xl">🫘</span>, image: "assets/red_bean_bun.png", difficulty: 1 }
         ];
 
-        // --- 对应食材库 ---
         const INGREDIENTS_POOL = [
           { id: '面团', name: '老面面团', icon: '⚪', image: "assets/dough.png" },
           { id: '秘制叉烧', name: '秘制叉烧', icon: '🍖', image: "assets/char_siu.png" },
@@ -267,7 +155,7 @@
           { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
           { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
           { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
-          { id: '芝士碎', name: '起司', icon: '🧀', image: "" }, 
+          { id: '芝士碎', name: '起司', icon: '🧀', image: "assets/cheese.png" }, 
           { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
           { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "assets/red_bean_paste.png" },
         ];
@@ -286,13 +174,16 @@
           const [isScoreSaved, setIsScoreSaved] = useState(false);
           const [leaderboardData, setLeaderboardData] = useState([]);
           const [isLoadingRank, setIsLoadingRank] = useState(false);
-          // isFoldClicking 已移除，使用 CSS active
           
           const [combo, setCombo] = useState(0); 
           const [isFever, setIsFever] = useState(false);
           const [feverClickAnim, setFeverClickAnim] = useState(null); 
           
-          // --- 音频系统状态 ---
+          // PWA
+          const [deferredPrompt, setDeferredPrompt] = useState(null);
+          const [showInstallModal, setShowInstallModal] = useState(false);
+          const [isIOS, setIsIOS] = useState(false);
+          
           const [isMuted, setIsMuted] = useState(false);
           const bgmRef = useRef(null); 
           const victoryBgmRef = useRef(null); 
@@ -302,14 +193,20 @@
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
 
-          // --- 初始化音频 ---
           useEffect(() => {
-              // 注意：这里路径统一为 assets/xxx.mp3
+              const isDeviceIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+              setIsIOS(isDeviceIOS);
+
+              const handleBeforeInstallPrompt = (e) => {
+                  e.preventDefault();
+                  setDeferredPrompt(e);
+              };
+              window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
               bgmRef.current = new Audio('assets/bgm.mp3');
               bgmRef.current.loop = true;
               bgmRef.current.volume = 0.5;
 
-              // 初始化胜利音乐
               victoryBgmRef.current = new Audio('assets/victory.mp3');
               victoryBgmRef.current.loop = true;
               victoryBgmRef.current.volume = 0.6;
@@ -324,47 +221,42 @@
               victoryBgmRef.current.load();
 
               return () => {
-                  if (bgmRef.current) {
-                      bgmRef.current.pause();
-                      bgmRef.current = null;
-                  }
-                  if (victoryBgmRef.current) {
-                      victoryBgmRef.current.pause();
-                      victoryBgmRef.current = null;
-                  }
+                  window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+                  if (bgmRef.current) { bgmRef.current.pause(); bgmRef.current = null; }
+                  if (victoryBgmRef.current) { victoryBgmRef.current.pause(); victoryBgmRef.current = null; }
               };
           }, []);
 
-          // --- BGM 控制逻辑 (更新) ---
+          const handleInstallClick = () => {
+              if (deferredPrompt) {
+                  deferredPrompt.prompt();
+                  deferredPrompt.userChoice.then((choiceResult) => {
+                      setDeferredPrompt(null);
+                      setShowInstallModal(false);
+                  });
+              } else {
+                  setShowInstallModal(true);
+              }
+          };
+
           useEffect(() => {
               if (!bgmRef.current || !victoryBgmRef.current) return;
-
               if (isMuted) {
                   bgmRef.current.pause();
                   victoryBgmRef.current.pause();
               } else {
                   if (gameState === 'PLAYING') {
-                      // 播放游戏 BGM，停止胜利音乐
                       victoryBgmRef.current.pause();
                       victoryBgmRef.current.currentTime = 0;
-                      
                       const playPromise = bgmRef.current.play();
-                      if (playPromise !== undefined) {
-                          playPromise.catch(error => console.log("Audio autoplay prevented or BGM not found"));
-                      }
+                      if (playPromise !== undefined) playPromise.catch(() => {});
                       bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
-
                   } else if (gameState === 'GAMEOVER') {
-                      // 播放胜利音乐，停止游戏 BGM
                       bgmRef.current.pause();
                       bgmRef.current.currentTime = 0;
-
                       const playPromise = victoryBgmRef.current.play();
-                      if (playPromise !== undefined) {
-                          playPromise.catch(error => console.error("Victory music play failed. Check if assets/victory.mp3 exists.", error));
-                      }
+                      if (playPromise !== undefined) playPromise.catch(() => {});
                   } else {
-                      // 菜单或其他状态：全停
                       bgmRef.current.pause();
                       bgmRef.current.currentTime = 0;
                       victoryBgmRef.current.pause();
@@ -373,10 +265,8 @@
               }
           }, [gameState, isMuted, isFever]);
 
-          // --- 音效播放辅助函数 ---
           const playSfx = (name) => {
               if (isMuted || !sfxRefs.current[name]) return;
-              
               if (name === 'pop' || name === 'win') {
                   const clone = sfxRefs.current[name].cloneNode();
                   clone.volume = name === 'win' ? 0.6 : 0.8; 
@@ -425,7 +315,6 @@
           const startFeverMode = () => {
              setIsFever(true);
              showFeedback('🔥 FEVER TIME! 时间暂停!', 'success');
-             
              setTimeout(() => {
                  setIsFever(false);
                  setTimeLeft(prev => prev + 5); 
@@ -434,16 +323,10 @@
              }, FEVER_DURATION);
           };
 
-          // --- FEVER 点击处理 ---
           const handleFeverClick = (side, e) => {
-              if(e) {
-                  e.preventDefault();
-                  e.stopPropagation();
-              }
-              
+              if(e) { e.preventDefault(); e.stopPropagation(); }
               playSfx('win'); 
               setScore(prev => prev + 1);
-              
               setFeverClickAnim(side);
               setTimeout(() => setFeverClickAnim(null), 50); 
           };
@@ -490,54 +373,36 @@
 
           const handleIngredientClick = (ing) => {
             if (cookingStep !== 'PREP' || isFever) return;
-
             if (!currentOrder.ingredients.includes(ing.id)) {
               playSfx('lose'); 
               showFeedback('❌ 食材错误！连击中断！', 'error');
-              setCombo(0); 
-              setWorktable([]); 
-              return;
+              setCombo(0); setWorktable([]); return;
             }
-
             if (worktable.length === 0 && ing.id !== '面团') {
-              playSfx('lose');
-              showFeedback('⚠️ 请先拿面团！', 'warning');
-              return;
+              playSfx('lose'); showFeedback('⚠️ 请先拿面团！', 'warning'); return;
             }
-            
             if (ing.id === '面团' && worktable.includes('面团')) {
-                showFeedback('⚠️ 已经有面团了！', 'warning');
-                return;
+                showFeedback('⚠️ 已经有面团了！', 'warning'); return;
             }
-            
             if (ing.id !== '面团' && worktable.includes(ing.id)) {
-                 showFeedback('⚠️ 已经加过了！', 'warning');
-                 return;
+                 showFeedback('⚠️ 已经加过了！', 'warning'); return;
             }
-
             playSfx('pop'); 
             const newWorktable = [...worktable, ing.id];
             setWorktable(newWorktable);
-
             const needed = [...currentOrder.ingredients].sort();
             const current = [...newWorktable].sort();
-            
             if (JSON.stringify(needed) === JSON.stringify(current)) {
               showFeedback('✅ 食材备齐！开始捏褶！', 'success');
               setTimeout(() => setCookingStep('FOLDING'), 150);
             }
           };
 
-          // --- 捏褶逻辑 (优化手感) ---
           const handleFold = () => {
             if (cookingStep !== 'FOLDING') return;
-            
             playSfx('pop'); 
-            // 移除 JS 状态动画
-
             const increment = 15; 
             const newProgress = foldProgress + increment;
-            
             if (newProgress >= 100) {
               setFoldProgress(100);
               setCookingStep('STEAMING');
@@ -566,7 +431,6 @@
             if (steamLockedRef.current) return;
             steamLockedRef.current = true;
             clearInterval(steamTimerRef.current);
-            
             if (steamProgress >= 80 && steamProgress <= 100) {
               handleSteamResult(true, '✨ 完美出炉！');
             } else if (steamProgress < 80) {
@@ -581,15 +445,12 @@
               playSfx('win'); 
               const newCombo = combo + 1;
               setCombo(newCombo);
-
               const points = 100 + Math.floor(timeLeft / 10);
               const comboBonus = Math.floor(points * (newCombo * 0.1));
               const totalPoints = points + comboBonus;
-
               const newScore = score + totalPoints;
               setScore(newScore); 
               showFeedback(`${msg} +${totalPoints} (连击 x${newCombo})`, 'success');
-              
               if (newCombo > 0 && newCombo % 5 === 0) {
                   setTimeout(startFeverMode, 500); 
               } else {
@@ -621,18 +482,6 @@
             return 'bg-yellow-500';
           };
 
-          const getStepInstruction = () => {
-              if (isFever) return "🔥 疯狂点击下方按钮! 🔥";
-              if (!currentOrder) return '';
-              if (worktable.length === 0) return "先取面团 ⚪";
-              const added = worktable;
-              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
-              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
-              return "准备捏褶！";
-          };
-
-          // --- 界面渲染 ---
-
           if (gameState === 'MENU') {
             return (
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
@@ -640,19 +489,7 @@
 
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop min-h-0">
                     <div className="w-full flex-1 min-h-0 mb-6 relative flex items-center justify-center">
-                        <SafeImage 
-                            src="assets/cover.png" 
-                            alt="B.O.D Game Cover" 
-                            className="max-h-full max-w-full object-contain rounded-2xl drop-shadow-2xl" 
-                            fallbackIcon={
-                                <div className="w-full h-full aspect-[4/5] max-h-full flex flex-col items-center justify-center text-center p-4 bg-white/90 backdrop-blur rounded-3xl shadow-xl border-4 border-orange-200">
-                                    <ChefHat size={80} className="text-red-600 mx-auto mb-4 shrink-0" />
-                                    <h1 className="text-3xl font-black text-red-800 shrink-0">B.O.D 包栈</h1>
-                                    <p className="text-orange-600 font-bold mt-2 shrink-0">极速包点师</p>
-                                    <p className="text-xs text-gray-400 mt-2">图片未加载: assets/cover.png</p>
-                                </div>
-                            }
-                        />
+                        <SafeImage src="assets/cover.png" alt="B.O.D Game Cover" className="max-h-full max-w-full object-contain rounded-2xl drop-shadow-2xl" fallbackIcon={<div className="text-center p-8 bg-white rounded-3xl shadow-xl border-4 border-orange-200"><ChefHat size={80} className="text-red-600 mx-auto mb-4 shrink-0" /><h1 className="text-3xl font-black text-red-800 shrink-0">B.O.D 包栈</h1><p className="text-orange-600 font-bold mt-2 shrink-0">极速包点师</p></div>} />
                     </div>
                     <div className="w-full space-y-4 px-4 shrink-0">
                         <button onClick={startGame} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 px-6 rounded-2xl text-xl shadow-[0_6px_0_#991b1b] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-3 border-2 border-red-700">
@@ -661,19 +498,45 @@
                         <button onClick={() => setGameState('LEADERBOARD')} className="w-full bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#ca8a04] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-yellow-500">
                           <Trophy size={20} /> 大师排行榜
                         </button>
+                        <button onClick={handleInstallClick} className="w-full bg-white/80 hover:bg-white text-neutral-800 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#d4d4d4] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-gray-300">
+                            <Download size={20} /> 添加到主屏幕
+                        </button>
                     </div>
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.10 (音乐+无阴影修复)</span>
+                    <span>By Weehom Liau • V0.12 (Full)</span>
                 </div>
+
+                {showInstallModal && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setShowInstallModal(false)}>
+                        <div className="bg-white rounded-3xl p-6 max-w-xs w-full relative shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+                            <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>
+                            {isIOS ? (
+                                <div className="space-y-4 text-gray-600">
+                                    <p className="font-bold text-black">📱 在 iPhone/iPad 上：</p>
+                                    <ol className="list-decimal list-inside space-y-3 text-sm">
+                                        <li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li>
+                                        <li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li>
+                                    </ol>
+                                </div>
+                            ) : (
+                                 <div className="space-y-4 text-gray-600">
+                                    <p className="font-bold text-black">📱 在 Android 浏览器上：</p>
+                                    <ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol>
+                                </div>
+                            )}
+                            <button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">知道了</button>
+                        </div>
+                    </div>
+                )}
               </div>
             );
           }
 
           if (gameState === 'LEADERBOARD') {
-             {/* ... (LEADERBOARD 保持不变) ... */}
-             return (
+            return (
               <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
                  <div className="w-full max-w-md mt-4 animate-pop flex flex-col h-full">
                    <div className="flex items-center justify-between mb-4 shrink-0">
@@ -681,27 +544,17 @@
                       <h2 className="text-xl font-bold text-yellow-400 flex items-center gap-2"><Trophy className="text-yellow-400" size={20} /> 包点大师榜</h2>
                       <div className="w-9"></div>
                    </div>
-                   
                    <div className="text-center mb-2 text-[10px] text-gray-400 shrink-0">
                      {isOnline ? <span className="text-green-400 flex items-center justify-center gap-1"><Globe size={10}/> 全球联网模式</span> : <span className="text-gray-500">离线模式 (填入 Key 开启联网)</span>}
                    </div>
-
                    <div className="bg-white text-neutral-900 rounded-xl shadow-xl overflow-hidden flex-1 overflow-y-auto">
                       <div className="bg-red-600 p-3 text-white font-bold grid grid-cols-12 text-xs text-center sticky top-0 z-10">
-                        <div className="col-span-2">排名</div>
-                        <div className="col-span-6 text-left pl-4">包点师</div>
-                        <div className="col-span-4">分数</div>
+                        <div className="col-span-2">排名</div><div className="col-span-6 text-left pl-4">包点师</div><div className="col-span-4">分数</div>
                       </div>
-                      
                       {isLoadingRank ? (
-                          <div className="p-8 text-center text-gray-500 flex flex-col items-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600 mb-2"></div>
-                            读取中...
-                          </div>
+                          <div className="p-8 text-center text-gray-500 flex flex-col items-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600 mb-2"></div>读取中...</div>
                       ) : leaderboardData.length === 0 ? (
-                        <div className="p-8 text-center text-gray-400 text-sm">
-                          暂无记录，快去挑战吧！
-                        </div>
+                        <div className="p-8 text-center text-gray-400 text-sm">暂无记录，快去挑战吧！</div>
                       ) : (
                         <div>
                           {leaderboardData.map((entry, index) => (
@@ -712,12 +565,8 @@
                                 {index === 2 && <Crown size={16} className="text-orange-400" fill="currentColor" />}
                                 {index > 2 && <span className="text-gray-500 text-xs">#{index + 1}</span>}
                               </div>
-                              <div className="col-span-6 text-left pl-4 font-bold text-gray-800 truncate">
-                                {entry.name}
-                              </div>
-                              <div className="col-span-4 font-mono font-bold text-red-600">
-                                {entry.score}
-                              </div>
+                              <div className="col-span-6 text-left pl-4 font-bold text-gray-800 truncate">{entry.name}</div>
+                              <div className="col-span-4 font-mono font-bold text-red-600">{entry.score}</div>
                             </div>
                           ))}
                         </div>
@@ -729,8 +578,7 @@
           }
 
           if (gameState === 'GAMEOVER') {
-             {/* ... (GAMEOVER 保持不变) ... */}
-             return (
+            return (
               <div className="h-full w-full flex flex-col items-center justify-center p-4 bg-neutral-900 text-white">
                 <div className="bg-white text-neutral-900 p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border-t-8 border-red-600 animate-pop">
                   <div className="relative inline-block">
@@ -739,149 +587,74 @@
                   </div>
                   <h2 className="text-2xl font-bold mb-1">营业结束</h2>
                   <p className="text-gray-500 mb-4 text-sm">本次得分</p>
-                  
-                  <div className="text-5xl font-black text-red-600 mb-2 font-mono">
-                    {score}
-                  </div>
-                  
-                  {combo > 1 && (
-                      <div className="text-orange-500 font-bold mb-4 flex items-center justify-center gap-1 animate-combo">
-                          <Flame size={16} /> 最大连击: {combo}
-                      </div>
-                  )}
-
+                  <div className="text-5xl font-black text-red-600 mb-2 font-mono">{score}</div>
+                  {combo > 1 && <div className="text-orange-500 font-bold mb-4 flex items-center justify-center gap-1 animate-combo"><Flame size={16} /> 最大连击: {combo}</div>}
                   {!isScoreSaved ? (
                     <div className="mb-6">
                        <p className="text-xs text-gray-500 mb-2">输入名字保存到排行榜</p>
                        <div className="flex gap-2">
                          <div className="relative flex-1">
                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                           <input 
-                              type="text" 
-                              value={playerName}
-                              onChange={(e) => setPlayerName(e.target.value)}
-                              placeholder="您的名字"
-                              className="w-full pl-9 pr-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-sm transition-all focus:ring-2 focus:ring-red-200"
-                              maxLength={10}
-                           />
+                           <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="您的名字" className="w-full pl-9 pr-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-sm transition-all focus:ring-2 focus:ring-red-200" maxLength={10} />
                          </div>
-                         <button 
-                            onClick={handleSaveScore}
-                            disabled={isLoadingRank}
-                            className={`bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-xl flex items-center transition-all active:scale-95 ${isLoadingRank ? 'opacity-50 cursor-not-allowed' : ''}`}
-                         >
-                            {isLoadingRank ? '...' : '保存'}
-                         </button>
+                         <button onClick={handleSaveScore} disabled={isLoadingRank} className={`bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-xl flex items-center transition-all active:scale-95 ${isLoadingRank ? 'opacity-50 cursor-not-allowed' : ''}`}>{isLoadingRank ? '...' : '保存'}</button>
                        </div>
                     </div>
                   ) : (
-                    <div className="mb-8 p-3 bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2 animate-in fade-in">
-                      <CheckCircle size={20} /> 成绩已上传
-                    </div>
+                    <div className="mb-8 p-3 bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2 animate-in fade-in"><CheckCircle size={20} /> 成绩已上传</div>
                   )}
-
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => setGameState('LEADERBOARD')}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <Trophy size={18}/> 排行榜
-                    </button>
-                    <button 
-                      onClick={startGame}
-                      className="bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <RotateCcw size={18}/> 再玩一次
-                    </button>
+                    <button onClick={() => setGameState('LEADERBOARD')} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"><Trophy size={18}/> 排行榜</button>
+                    <button onClick={startGame} className="bg-yellow-500 hover:bg-yellow-400 text-red-900 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"><RotateCcw size={18}/> 再玩一次</button>
                   </div>
-                  
-                  <button 
-                    onClick={() => setGameState('MENU')}
-                    className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm font-medium py-2 transition-colors"
-                  >
-                    返回主菜单
-                  </button>
+                  <button onClick={() => setGameState('MENU')} className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm font-medium py-2 transition-colors">返回主菜单</button>
                 </div>
               </div>
             );
           }
 
-          if (!currentOrder && gameState === 'PLAYING') {
-              return <div className="h-full flex items-center justify-center bg-gray-100">准备中...</div>;
-          }
+          if (!currentOrder && gameState === 'PLAYING') return <div className="h-full flex items-center justify-center bg-gray-100">准备中...</div>;
 
           return (
             <div className={`h-full w-full flex flex-col font-sans overflow-hidden ${isFever ? 'animate-fever-bg bg-gradient-to-br from-red-600 via-yellow-500 to-red-600' : ''}`}>
-              {/* ... Top Bar ... */}
               <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${isFever ? 'bg-transparent' : (timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700')}`}>
                 <div className="flex justify-between items-center h-8">
                     <div className="flex items-center gap-2 font-bold text-base">
-                        {/* 音量控制按钮 */}
-                        <button 
-                            onClick={() => setIsMuted(!isMuted)} 
-                            className="p-1 rounded-full hover:bg-white/20 transition-colors"
-                        >
-                            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                        </button>
-
+                        <button onClick={() => setIsMuted(!isMuted)} className="p-1 rounded-full hover:bg-white/20 transition-colors">{isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
                         <div className={`p-0.5 rounded-lg transition-colors ${isFever ? 'bg-white/20' : (timeLeft < 10 ? 'bg-red-900' : 'bg-red-800')}`}><Timer size={16}/></div>
                         <span className={`${timeLeft < 10 ? 'text-yellow-300 scale-110 font-black' : ''} transition-all flex items-center gap-1`}>
                             {isFever ? <span className="animate-pulse"><Clock size={14}/> PAUSED</span> : `${timeLeft}s`}
                         </span>
                     </div>
-                    
                     {isFever ? (
-                         <div className="font-black text-xl text-yellow-200 animate-pulse flex items-center gap-1">
-                             <Zap className="fill-yellow-200" size={20} /> FEVER MODE!
-                         </div>
+                         <div className="font-black text-xl text-yellow-200 animate-pulse flex items-center gap-1"><Zap className="fill-yellow-200" size={20} /> FEVER MODE!</div>
                     ) : (
                          <div className="flex items-center gap-4">
-                             {combo > 1 && (
-                                 <div className="font-bold text-yellow-300 flex items-center gap-1 animate-combo text-sm">
-                                     <Flame size={14} className="fill-yellow-300"/> {combo}
-                                 </div>
-                             )}
-                             <div className="font-black text-lg text-yellow-400 flex items-center gap-1">
-                                 {score}
-                             </div>
+                             {combo > 1 && <div className="font-bold text-yellow-300 flex items-center gap-1 animate-combo text-sm"><Flame size={14} className="fill-yellow-300"/> {combo}</div>}
+                             <div className="font-black text-lg text-yellow-400 flex items-center gap-1">{score}</div>
                          </div>
                     )}
                 </div>
                 <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
-                    <div
-                        className={`h-full transition-all duration-1000 ease-linear ${isFever ? 'bg-white' : (timeLeft < 10 ? 'bg-yellow-400' : 'bg-yellow-300')}`}
-                        style={{ width: `${(timeLeft / GAME_DURATION) * 100}%` }}
-                    ></div>
+                    <div className={`h-full transition-all duration-1000 ease-linear ${isFever ? 'bg-white' : (timeLeft < 10 ? 'bg-yellow-400' : 'bg-yellow-300')}`} style={{ width: `${(timeLeft / GAME_DURATION) * 100}%` }}></div>
                 </div>
               </div>
 
-              {/* FEVER 模式下的主界面 - 重点修改：onPointerDown 零延迟 + CSS 动画 */}
               {isFever ? (
                   <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6 animate-pop">
                       <div className="text-white/90 text-center text-sm font-bold tracking-widest mb-2">疯狂交替点击！+1分</div>
                       <div className="flex gap-4 w-full h-64">
-                          <button 
-                             onPointerDown={(e) => handleFeverClick('left', e)}
-                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}
-                          >
-                             <span className="text-6xl group-active:scale-125 transition-transform">🥟</span>
-                             <span className="text-2xl font-black text-orange-600">捏包</span>
+                          <button onPointerDown={(e) => handleFeverClick('left', e)} className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}>
+                             <span className="text-6xl group-active:scale-125 transition-transform">🥟</span><span className="text-2xl font-black text-orange-600">捏包</span>
                           </button>
-                          <button 
-                             onPointerDown={(e) => handleFeverClick('right', e)}
-                             className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}
-                          >
-                             <span className="text-6xl group-active:scale-125 transition-transform">♨️</span>
-                             <span className="text-2xl font-black text-red-600">蒸包</span>
+                          <button onPointerDown={(e) => handleFeverClick('right', e)} className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}>
+                             <span className="text-6xl group-active:scale-125 transition-transform">♨️</span><span className="text-2xl font-black text-red-600">蒸包</span>
                           </button>
                       </div>
-                      <div className="text-4xl font-black text-yellow-300 drop-shadow-lg animate-bounce">
-                          SCORE: {score}
-                      </div>
+                      <div className="text-4xl font-black text-yellow-300 drop-shadow-lg animate-bounce">SCORE: {score}</div>
                   </div>
               ) : (
                   <>
-                      {/* ... (NORMAL MODE) 保持不变 - 这里使用捏包优化版逻辑 ... */}
                       <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                         <div className="flex items-center gap-4">
                           <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group bg-orange-100">
@@ -911,7 +684,6 @@
                       </div>
 
                       <div className="flex-1 bg-neutral-100 relative overflow-y-auto flex flex-col">
-                        
                         {feedback && (
                           <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold flex items-center gap-2 animate-bounce ${getFeedbackColor()}`}>
                             {feedback.type === 'success' ? <CheckCircle size={20}/> : <XCircle size={20}/>}
@@ -920,7 +692,6 @@
                         )}
 
                         <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px] h-full min-h-[300px]">
-                          
                           {cookingStep === 'PREP' && (
                             <div className="relative w-full flex flex-col items-center justify-evenly h-full">
                                 <div className="relative">
@@ -930,52 +701,27 @@
                                             const ingredient = INGREDIENTS_POOL.find(p => p.id === ing);
                                             return (
                                                 <div key={i} className="absolute text-3xl animate-pop flex items-center justify-center" style={{ transform: `translate(${Math.random()*20-10}px, ${Math.random()*20-10}px)` }}>
-                                                    <SafeImage 
-                                                        src={ingredient.image} 
-                                                        alt={ingredient.name} 
-                                                        className="w-8 h-8 object-contain drop-shadow-md" 
-                                                        fallbackIcon={<span className="text-xl">{ingredient.icon}</span>}
-                                                    />
+                                                    <SafeImage src={ingredient.image} alt={ingredient.name} className="w-8 h-8 object-contain drop-shadow-md" fallbackIcon={<span className="text-xl">{ingredient.icon}</span>} />
                                                 </div>
                                             );
                                         })}
                                     </div>
-                                    
                                     {worktable.length > 0 && (
-                                        <button 
-                                            onClick={handleResetWorktable}
-                                            className="absolute -right-4 -top-2 bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-full border-2 border-red-200 shadow-md transition-all active:scale-90"
-                                            title="清空工作台"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <button onClick={handleResetWorktable} className="absolute -right-4 -top-2 bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-full border-2 border-red-200 shadow-md transition-all active:scale-90" title="清空工作台"><Trash2 size={16} /></button>
                                     )}
                                 </div>
                             </div>
                           )}
 
-                          {/* 捏包环节优化：同样使用 onPointerDown + CSS active */}
                           {cookingStep === 'FOLDING' && (
                             <div className="flex flex-col items-center justify-center w-full h-full">
-                               <div 
-                                 className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform duration-75 active:scale-90 relative overflow-hidden`}
-                                 onPointerDown={handleFold}
-                               >
-                                 <SafeImage 
-                                    src="assets/folding_bun.png"
-                                    alt="Raw Bun"
-                                    className="w-full h-full object-cover" 
-                                    fallbackIcon={<div className="text-6xl">⚪</div>}
-                                 />
+                               <div className={`w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer transition-transform duration-75 active:scale-90 relative overflow-hidden`} onPointerDown={handleFold}>
+                                 <SafeImage src="assets/folding_bun.png" alt="Raw Bun" className="w-full h-full object-cover" fallbackIcon={<div className="text-6xl">⚪</div>} />
                                  <div className="absolute inset-0 bg-black opacity-10" style={{ clipPath: `polygon(50% 50%, ${100-foldProgress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
-                                 <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full">
-                                    {foldProgress}%
-                                 </div>
+                                 <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full">{foldProgress}%</div>
                                </div>
                                <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm">疯狂点击包子！</p>
-                               <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
-                                 <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div>
-                               </div>
+                               <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${foldProgress}%` }}></div></div>
                             </div>
                           )}
 
@@ -988,18 +734,7 @@
                                          <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
                                   </div>
                                   <div className="w-full h-full relative animate-pump">
-                                     <SafeImage 
-                                        src="./assets/steamer.png" 
-                                        alt="Steamer" 
-                                        className="w-full h-full object-contain drop-shadow-xl" 
-                                        fallbackIcon={
-                                            <div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center">
-                                                <div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center">
-                                                    <span className="text-6xl">♨️</span>
-                                                </div>
-                                            </div>
-                                        } 
-                                     />
+                                     <SafeImage src="assets/steamer.png" alt="Steamer" className="w-full h-full object-contain" fallbackIcon={<div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center"><div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center"><span className="text-6xl">♨️</span></div></div>} />
                                   </div>
                                   <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
                                         <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
@@ -1016,18 +751,10 @@
                                         <div className="absolute right-0 top-[90%] w-1.5 h-px bg-gray-400"></div>
                                   </div>
                                </div>
-                               
-                               <button 
-                                 onMouseDown={handleStopSteam}
-                                 onTouchStart={handleStopSteam}
-                                 className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all"
-                               >
-                                 立即出炉!
-                               </button>
+                               <button onMouseDown={handleStopSteam} onTouchStart={handleStopSteam} className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all">立即出炉!</button>
                                <p className="mt-2 text-[10px] text-gray-500 font-bold">绿色刻度点击</p>
                             </div>
                           )}
-
                         </div>
 
                         {cookingStep === 'PREP' && (
@@ -1039,25 +766,16 @@
                                 const isAdded = worktable.includes(ing.id);
                                 const isNextStepDough = worktable.length === 0 && ing.id === '面团';
                                 const isNextStepIngredient = worktable.length > 0 && isNeeded && !isAdded;
-                                
                                 const shouldHighlight = isNextStepDough || isNextStepIngredient;
 
                                 return (
                                 <button
                                   key={ing.id}
                                   onClick={() => handleIngredientClick(ing)}
-                                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative
-                                     ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}
-                                  `}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}`}
                                 >
                                   <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
-                                      <SafeImage 
-                                        key={ing.image} 
-                                        src={ing.image} 
-                                        alt={ing.name} 
-                                        className="w-full h-full object-contain" 
-                                        fallbackIcon={<span className="text-3xl">{ing.icon}</span>}
-                                      />
+                                      <SafeImage key={ing.image} src={ing.image} alt={ing.name} className="w-full h-full object-contain" fallbackIcon={<span className="text-3xl">{ing.icon}</span>} />
                                   </div>
                                   <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
                                 </button>
