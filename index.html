@@ -31,7 +31,6 @@
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
       .animate-fever-bg { background-size: 200% 200%; animation: fever-bg 1s ease infinite; }
       
-      /* 优化：开启硬件加速，减少卡顿 */
       .gpu-accel { transform: translateZ(0); will-change: transform; }
       
       body { touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -83,6 +82,7 @@
                 const analytics = getAnalytics(app); 
                 db = getFirestore(app);
                 isOnline = true;
+                console.log("🔥 Firebase 连接成功");
             } catch (e) {
                 console.error("Firebase Init Error:", e);
             }
@@ -116,7 +116,7 @@
           }
         };
 
-        // --- 优化：使用 memo 的图片组件 ---
+        // --- 高性能图片组件 ---
         const SafeImage = memo(({ src, alt, fallbackIcon, className }) => {
             const [status, setStatus] = useState('loading'); 
             useEffect(() => { if(src) setStatus('loading'); }, [src]);
@@ -136,8 +136,7 @@
             );
         });
 
-        // --- 关键优化：独立的捏褶组件 (FoldingStage) ---
-        // 只有这个组件会在点击时重绘，不影响全局
+        // --- 捏褶组件 ---
         const FoldingStage = memo(({ onComplete, playSfx, targetImage }) => {
             const [progress, setProgress] = useState(0);
 
@@ -145,14 +144,11 @@
                 e.preventDefault();
                 e.stopPropagation();
                 
-                // 音效
-                playSfx('pop');
+                playSfx('pop'); // 调用 Web Audio 播放
                 
-                // 进度更新
                 setProgress(prev => {
                     const next = prev + 15;
                     if (next >= 100) {
-                        // 延迟一点通知完成，避免视觉突变太快
                         requestAnimationFrame(() => onComplete());
                         return 100;
                     }
@@ -212,8 +208,6 @@
           const [currentOrder, setCurrentOrder] = useState(null);
           const [worktable, setWorktable] = useState([]); 
           const [cookingStep, setCookingStep] = useState('PREP'); 
-          // 移除了 foldProgress 状态，交给子组件管理
-          
           const [steamProgress, setSteamProgress] = useState(0); 
           const [feedback, setFeedback] = useState(null); 
           const [playerName, setPlayerName] = useState('');
@@ -230,14 +224,21 @@
           const [isIOS, setIsIOS] = useState(false);
           
           const [isMuted, setIsMuted] = useState(false);
-          const bgmRef = useRef(null); 
-          const victoryBgmRef = useRef(null); 
-          const sfxPools = useRef({});
+          
+          // 核心优化：Web Audio Context
+          const audioCtxRef = useRef(null); 
+          const bgmNodeRef = useRef(null); // BGM 使用 BufferSource 或 HTMLAudio 均可，这里保留 HTMLAudio 方便
+          const bgmElementRef = useRef(null); 
+          const victoryElementRef = useRef(null); 
+
+          // 音效 Buffer 池
+          const sfxBuffers = useRef({});
 
           const steamLockedRef = useRef(false);
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
 
+          // --- 初始化音频系统 (Web Audio API) ---
           useEffect(() => {
               const isDeviceIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
               setIsIOS(isDeviceIOS);
@@ -248,30 +249,45 @@
               };
               window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-              bgmRef.current = new Audio('assets/bgm.mp3');
-              bgmRef.current.loop = true;
-              bgmRef.current.volume = 0.3;
+              // 1. 初始化 Audio Context
+              const AudioContext = window.AudioContext || window.webkitAudioContext;
+              if (AudioContext) {
+                  audioCtxRef.current = new AudioContext();
+              }
 
-              victoryBgmRef.current = new Audio('assets/victory.mp3');
-              victoryBgmRef.current.loop = true;
-              victoryBgmRef.current.volume = 0.4;
-
-              const createPool = (src, size) => Array.from({length: size}, () => {
-                  const a = new Audio(src);
-                  a.load();
-                  return a;
-              });
-
-              sfxPools.current = {
-                  pop: createPool('assets/pop.mp3', 10),
-                  win: createPool('assets/win.mp3', 10),
-                  lose: createPool('assets/lose.mp3', 3),
+              // 2. 加载音效文件到 Buffer
+              const loadSound = async (url, name) => {
+                  if (!audioCtxRef.current) return;
+                  try {
+                      const response = await fetch(url);
+                      const arrayBuffer = await response.arrayBuffer();
+                      const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer);
+                      sfxBuffers.current[name] = audioBuffer;
+                  } catch (error) {
+                      console.warn(`Failed to load sound: ${url}`, error);
+                  }
               };
+
+              if (audioCtxRef.current) {
+                  loadSound('assets/pop.mp3', 'pop');
+                  loadSound('assets/win.mp3', 'win');
+                  loadSound('assets/lose.mp3', 'lose');
+              }
+
+              // 3. BGM 依然使用 HTMLAudioElement (方便循环和流式)
+              bgmElementRef.current = new Audio('assets/bgm.mp3');
+              bgmElementRef.current.loop = true;
+              bgmElementRef.current.volume = 0.3;
+
+              victoryElementRef.current = new Audio('assets/victory.mp3');
+              victoryElementRef.current.loop = true;
+              victoryElementRef.current.volume = 0.4;
 
               return () => {
                   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-                  if (bgmRef.current) { bgmRef.current.pause(); bgmRef.current = null; }
-                  if (victoryBgmRef.current) { victoryBgmRef.current.pause(); victoryBgmRef.current = null; }
+                  if (audioCtxRef.current) audioCtxRef.current.close();
+                  if (bgmElementRef.current) { bgmElementRef.current.pause(); bgmElementRef.current = null; }
+                  if (victoryElementRef.current) { victoryElementRef.current.pause(); victoryElementRef.current = null; }
               };
           }, []);
 
@@ -287,41 +303,63 @@
               }
           };
 
+          // --- BGM 控制 ---
           useEffect(() => {
-              if (!bgmRef.current || !victoryBgmRef.current) return;
+              if (!bgmElementRef.current || !victoryElementRef.current) return;
+
               if (isMuted) {
-                  bgmRef.current.pause();
-                  victoryBgmRef.current.pause();
+                  bgmElementRef.current.pause();
+                  victoryElementRef.current.pause();
               } else {
                   if (gameState === 'PLAYING') {
-                      victoryBgmRef.current.pause();
-                      victoryBgmRef.current.currentTime = 0;
-                      const playPromise = bgmRef.current.play();
+                      // 尝试恢复 AudioContext (iOS 需要)
+                      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                          audioCtxRef.current.resume();
+                      }
+                      
+                      victoryElementRef.current.pause();
+                      victoryElementRef.current.currentTime = 0;
+                      
+                      const playPromise = bgmElementRef.current.play();
                       if (playPromise !== undefined) playPromise.catch(() => {});
-                      bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
+                      bgmElementRef.current.playbackRate = isFever ? 1.5 : 1.0;
+
                   } else if (gameState === 'GAMEOVER') {
-                      bgmRef.current.pause();
-                      bgmRef.current.currentTime = 0;
-                      const playPromise = victoryBgmRef.current.play();
+                      bgmElementRef.current.pause();
+                      bgmElementRef.current.currentTime = 0;
+                      const playPromise = victoryElementRef.current.play();
                       if (playPromise !== undefined) playPromise.catch(() => {});
                   } else {
-                      bgmRef.current.pause();
-                      bgmRef.current.currentTime = 0;
-                      victoryBgmRef.current.pause();
-                      victoryBgmRef.current.currentTime = 0;
+                      bgmElementRef.current.pause();
+                      bgmElementRef.current.currentTime = 0;
+                      victoryElementRef.current.pause();
+                      victoryElementRef.current.currentTime = 0;
                   }
               }
           }, [gameState, isMuted, isFever]);
 
+          // --- 极速音效播放 (Web Audio API) ---
           const playSfx = useCallback((name) => {
-              if (isMuted || !sfxPools.current[name]) return;
-              const pool = sfxPools.current[name];
-              const sound = pool.find(s => s.paused) || pool[0];
-              sound.currentTime = 0;
-              sound.volume = 1.0;
-              sound.play().catch(() => {});
+              if (isMuted || !audioCtxRef.current || !sfxBuffers.current[name]) return;
+              
+              const ctx = audioCtxRef.current;
+              if (ctx.state === 'suspended') ctx.resume();
+
+              const source = ctx.createBufferSource();
+              source.buffer = sfxBuffers.current[name];
+              
+              // 音量控制 (GainNode)
+              const gainNode = ctx.createGain();
+              // 保持原需求的音量设置
+              gainNode.gain.value = 1.0; 
+              
+              source.connect(gainNode);
+              gainNode.connect(ctx.destination);
+              
+              source.start(0);
           }, [isMuted]);
 
+          // ... Timer, Leaderboard logic ...
           useEffect(() => {
             if (gameState === 'PLAYING' && !isFever) {
               timerRef.current = setInterval(() => {
@@ -416,46 +454,31 @@
 
           const handleIngredientClick = (ing) => {
             if (cookingStep !== 'PREP' || isFever) return;
-
             if (!currentOrder.ingredients.includes(ing.id)) {
               playSfx('lose'); 
               showFeedback('❌ 食材错误！连击中断！', 'error');
-              setCombo(0); 
-              setWorktable([]); 
-              return;
+              setCombo(0); setWorktable([]); return;
             }
-
             if (worktable.length === 0 && ing.id !== '面团') {
-              playSfx('lose');
-              showFeedback('⚠️ 请先拿面团！', 'warning');
-              return;
+              playSfx('lose'); showFeedback('⚠️ 请先拿面团！', 'warning'); return;
             }
-            
             if (ing.id === '面团' && worktable.includes('面团')) {
-                showFeedback('⚠️ 已经有面团了！', 'warning');
-                return;
+                showFeedback('⚠️ 已经有面团了！', 'warning'); return;
             }
-            
             if (ing.id !== '面团' && worktable.includes(ing.id)) {
-                 showFeedback('⚠️ 已经加过了！', 'warning');
-                 return;
+                 showFeedback('⚠️ 已经加过了！', 'warning'); return;
             }
-
             playSfx('pop'); 
             const newWorktable = [...worktable, ing.id];
             setWorktable(newWorktable);
-
             const needed = [...currentOrder.ingredients].sort();
             const current = [...newWorktable].sort();
-            
             if (JSON.stringify(needed) === JSON.stringify(current)) {
               showFeedback('✅ 食材备齐！开始捏褶！', 'success');
-              // 秒进转场
               setTimeout(() => setCookingStep('FOLDING'), 150);
             }
           };
 
-          // --- 捏包完成回调 ---
           const handleFoldComplete = useCallback(() => {
             setCookingStep('STEAMING');
             showFeedback('🥟 造型完美！放入蒸笼！', 'success');
@@ -480,7 +503,6 @@
             if (steamLockedRef.current) return;
             steamLockedRef.current = true;
             clearInterval(steamTimerRef.current);
-            
             if (steamProgress >= 80 && steamProgress <= 100) {
               handleSteamResult(true, '✨ 完美出炉！');
             } else if (steamProgress < 80) {
@@ -495,15 +517,12 @@
               playSfx('win'); 
               const newCombo = combo + 1;
               setCombo(newCombo);
-
               const points = 100 + Math.floor(timeLeft / 10);
               const comboBonus = Math.floor(points * (newCombo * 0.1));
               const totalPoints = points + comboBonus;
-
               const newScore = score + totalPoints;
               setScore(newScore); 
               showFeedback(`${msg} +${totalPoints} (连击 x${newCombo})`, 'success');
-              
               if (newCombo > 0 && newCombo % 5 === 0) {
                   setTimeout(startFeverMode, 500); 
               } else {
@@ -532,6 +551,16 @@
             if (feedback.type === 'error') return 'bg-red-500';
             if (feedback.type === 'success') return 'bg-green-500';
             return 'bg-yellow-500';
+          };
+
+          const getStepInstruction = () => {
+              if (isFever) return "🔥 疯狂点击下方按钮! 🔥";
+              if (!currentOrder) return '';
+              if (worktable.length === 0) return "先取面团 ⚪";
+              const added = worktable;
+              const missing = currentOrder.ingredients.filter(ing => !added.includes(ing));
+              if (missing.length > 0) return `还需：${missing.join(' + ')}`;
+              return "准备捏褶！";
           };
 
           // --- 界面渲染 ---
@@ -571,23 +600,14 @@
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5">
                     <span>MADE FOR B.O.D GAMES</span>
-                    <span>By Weehom Liau • V0.16 (零卡顿重构)</span>
+                    <span>By Weehom Liau • V0.17 (WebAudio)</span>
                 </div>
-                
-                {showInstallModal && (
-                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setShowInstallModal(false)}>
-                        <div className="bg-white rounded-3xl p-6 max-w-xs w-full relative shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
-                            <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>
-                            {isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}
-                            <button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">知道了</button>
-                        </div>
-                    </div>
-                )}
+                {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full relative shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">知道了</button></div></div>)}
               </div>
             );
           }
 
+          // ... LEADERBOARD & GAMEOVER ...
           if (gameState === 'LEADERBOARD') {
             return (
               <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
@@ -632,6 +652,7 @@
 
           return (
             <div className={`h-full w-full flex flex-col font-sans overflow-hidden ${isFever ? 'animate-fever-bg bg-gradient-to-br from-red-600 via-yellow-500 to-red-600' : ''}`}>
+              {/* ... Top Bar ... */}
               <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${isFever ? 'bg-transparent' : (timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700')}`}>
                 <div className="flex justify-between items-center h-8">
                     <div className="flex items-center gap-2 font-bold text-base">
@@ -667,7 +688,7 @@
                               {currentOrder.ingredients.map((ingName, idx) => {
                                  const isCollected = worktable.includes(ingName);
                                  const ingData = INGREDIENTS_POOL.find(p => p.id === ingName);
-                                 return (<div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}><span className="text-sm">{ingData?.icon}</span><span className="text-xs font-bold">{ingName}</span>{isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full bg-green-100" />}</div>);
+                                 return (<div key={idx} className={`relative flex items-center gap-1.5 px-2 py-1 rounded border-2 transition-all ${isCollected ? 'bg-green-100 border-green-500 text-green-800 scale-105' : 'bg-gray-50 border-gray-300 border-dashed text-gray-400'}`}><span className="text-sm">{ingData?.icon}</span><span className="text-xs font-bold">{ingName}</span>{isCollected && <CheckCircle size={10} className="absolute -top-1.5 -right-1.5 text-green-500 rounded-full" />}</div>);
                               })}
                             </div>
                           </div>
@@ -679,6 +700,7 @@
                         <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px] h-full min-h-[300px]">
                           {cookingStep === 'PREP' && (
                             <div className="relative w-full flex flex-col items-center justify-evenly h-full">
+                                <div className="bg-white/80 backdrop-blur px-4 py-1 rounded-full shadow-sm text-red-600 text-sm font-bold border border-red-100">{getStepInstruction()}</div>
                                 <div className="relative">
                                     <div className="relative w-40 h-40 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center animate-pop shrink-0 gpu-accel">
                                         {worktable.includes('面团') && <div className="absolute w-32 h-32 bg-orange-50 rounded-full border border-orange-100 shadow-inner animate-pop"></div>}
@@ -692,10 +714,7 @@
                             </div>
                           )}
 
-                          {/* 使用分离的 FoldingStage 组件 */}
-                          {cookingStep === 'FOLDING' && (
-                             <FoldingStage onComplete={handleFoldComplete} playSfx={playSfx} targetImage={currentOrder.image} />
-                          )}
+                          {cookingStep === 'FOLDING' && <FoldingStage onComplete={handleFoldComplete} playSfx={playSfx} targetImage={currentOrder.image} />}
 
                           {cookingStep === 'STEAMING' && (
                             <div className="flex flex-col items-center w-full justify-center h-full">
@@ -741,18 +760,16 @@
                                 const shouldHighlight = isNextStepDough || isNextStepIngredient;
 
                                 return (
-                                    <button
-                                      key={ing.id}
-                                      onClick={() => handleIngredientClick(ing)}
-                                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 aspect-square overflow-hidden group relative ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}`}
-                                    >
-                                      <div className={`w-12 h-12 flex items-center justify-center mb-1 transition-transform`}>
-                                          <SafeImage key={ing.image} src={ing.image} alt={ing.name} className="w-full h-full object-contain" fallbackIcon={<span className="text-3xl">{ing.icon}</span>} />
-                                      </div>
-                                      <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
-                                    </button>
-                                )
-                              })}
+                                    <IngredientBtn 
+                                        key={ing.id} 
+                                        ing={ing} 
+                                        isNeeded={isNeeded} 
+                                        isAdded={isAdded} 
+                                        isNextStepDough={isNextStepDough} 
+                                        isNextStepIngredient={isNextStepIngredient} 
+                                        onClick={handleIngredientClick}
+                                    />
+                                )})}
                             </div>
                           </div>
                         )}
