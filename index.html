@@ -54,16 +54,15 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare, Gift, Copy, Lock } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare, Gift, Copy, Lock, Edit2 } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, where, updateDoc, doc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
         const GAME_DURATION = 90; 
         const FEVER_DURATION = 5000; 
 
-        // --- 奖励配置 ---
         const REWARDS_CONFIG = [
             { id: 'r1', score: 1000, title: '优秀学徒', discount: 'RM5 OFF', minSpend: 'Min Spend RM50', code: 'BN5', expiry: '31/12' },
             { id: 'r2', score: 2000, title: '高级包点师', discount: 'RM10 OFF', minSpend: 'Min Spend RM100', code: 'AM10', expiry: '31/12' },
@@ -97,9 +96,25 @@
         const getLeaderboard = async () => {
           if (isOnline && db) {
             try {
-                const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(30));
+                // 1. 读取更多数据 (60条) 以便进行客户端去重
+                const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(60));
                 const querySnapshot = await getDocs(q);
-                return querySnapshot.docs.map(doc => doc.data());
+                const rawData = querySnapshot.docs.map(doc => doc.data());
+                
+                // 2. 客户端去重：同名只保留最高分（由于已经按分数降序，保留遇到的第一个名字即可）
+                const uniqueData = [];
+                const seenNames = new Set();
+                
+                for (const entry of rawData) {
+                    if (!seenNames.has(entry.name)) {
+                        seenNames.add(entry.name);
+                        uniqueData.push(entry);
+                        // 只取前30名
+                        if (uniqueData.length >= 30) break;
+                    }
+                }
+                
+                return uniqueData;
             } catch (error) { return []; }
           } else {
             const saved = localStorage.getItem('bod_leaderboard');
@@ -109,14 +124,50 @@
 
         const saveScoreToLeaderboard = async (name, score) => {
           const newEntry = { name, score, date: new Date().toISOString() };
+          
           if (isOnline && db) {
             try {
-                await addDoc(collection(db, "leaderboard"), newEntry);
+                // 1. 检查该名字是否存在
+                const q = query(collection(db, "leaderboard"), where("name", "==", name));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    // 2. 存在则检查是否需要更新
+                    const userDoc = querySnapshot.docs[0];
+                    const oldScore = userDoc.data().score;
+                    
+                    if (score > oldScore) {
+                        // 3. 新纪录！更新文档
+                        await updateDoc(doc(db, "leaderboard", userDoc.id), { 
+                            score: score, 
+                            date: new Date().toISOString() 
+                        });
+                    }
+                    // 如果没破纪录，什么都不做
+                } else {
+                    // 4. 新用户，创建文档
+                    await addDoc(collection(db, "leaderboard"), newEntry);
+                }
                 return await getLeaderboard();
-            } catch (error) { return []; }
+            } catch (error) { 
+                console.error("Save error:", error);
+                return []; 
+            }
           } else {
-            const current = localStorage.getItem('bod_leaderboard') ? JSON.parse(localStorage.getItem('bod_leaderboard')) : [];
-            const updated = [...current, newEntry].sort((a, b) => b.score - a.score).slice(0, 30);
+            // 离线逻辑：同名覆盖
+            let current = localStorage.getItem('bod_leaderboard') ? JSON.parse(localStorage.getItem('bod_leaderboard')) : [];
+            const existingIdx = current.findIndex(item => item.name === name);
+            
+            if (existingIdx >= 0) {
+                if (score > current[existingIdx].score) {
+                    current[existingIdx].score = score;
+                    current[existingIdx].date = new Date().toISOString();
+                }
+            } else {
+                current.push(newEntry);
+            }
+            
+            const updated = current.sort((a, b) => b.score - a.score).slice(0, 30);
             localStorage.setItem('bod_leaderboard', JSON.stringify(updated));
             return updated;
           }
@@ -128,7 +179,14 @@
             if (!src) return fallbackIcon;
             return (
                 <div className={`relative ${className} w-full h-full flex items-center justify-center overflow-hidden gpu-accel`}>
-                    <img src={src} alt={alt} loading="eager" className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setStatus('loaded')} onError={() => setStatus('error')} />
+                    <img 
+                        src={src} 
+                        alt={alt} 
+                        loading="eager" 
+                        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`} 
+                        onLoad={() => setStatus('loaded')} 
+                        onError={() => setStatus('error')} 
+                    />
                     {status === 'loading' && <div className="absolute inset-0 flex items-center justify-center bg-gray-100/50"><Loader2 className="animate-spin text-red-500" size={24} /></div>}
                     {status === 'error' && <div className="absolute inset-0 flex items-center justify-center">{fallbackIcon}</div>}
                 </div>
@@ -223,11 +281,10 @@
           const [showInstallModal, setShowInstallModal] = useState(false);
           const [isIOS, setIsIOS] = useState(false);
           
-          // 奖励系统
           const [unlockedRewards, setUnlockedRewards] = useState([]);
           const [newRewardUnlocked, setNewRewardUnlocked] = useState(null);
-          
           const [isMuted, setIsMuted] = useState(false);
+
           const bgmRef = useRef(null); 
           const victoryBgmRef = useRef(null); 
           const sfxPools = useRef({});
@@ -239,6 +296,9 @@
           useEffect(() => {
               const isDeviceIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
               setIsIOS(isDeviceIOS);
+
+              const savedName = localStorage.getItem('bod_player_name');
+              if (savedName) setPlayerName(savedName);
 
               const handleBeforeInstallPrompt = (e) => {
                   e.preventDefault();
@@ -389,7 +449,7 @@
             setGameState('PLAYING');
             setFeedback(null);
             setIsScoreSaved(false);
-            setPlayerName('');
+            // playerName 保持上次输入
             setNewRewardUnlocked(null);
           };
 
@@ -423,6 +483,8 @@
               showFeedback('✍️ 请输入名字！', 'error');
               return;
             }
+            localStorage.setItem('bod_player_name', playerName);
+            
             setIsLoadingRank(true);
             await saveScoreToLeaderboard(playerName, score);
             setIsScoreSaved(true);
@@ -573,7 +635,7 @@
                         <button onClick={handleInstallClick} className="w-full bg-white/80 hover:bg-white text-neutral-800 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#d4d4d4] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-gray-300"><Download size={20} /> 添加到主屏幕</button>
                     </div>
                 </div>
-                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>MADE FOR B.O.D GAMES</span><span>By Weehom Liau • V0.22 (模糊版)</span></div>
+                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>MADE FOR B.O.D GAMES</span><span>By Weehom Liau • V0.24 (榜单去重)</span></div>
                 {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3><p className="text-gray-600 text-sm mb-4">请使用浏览器菜单中的“添加到主屏幕”功能。</p><button onClick={() => setShowInstallModal(false)} className="w-full bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
               </div>
             );
@@ -694,7 +756,7 @@
                   <>
                       <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                         <div className="flex items-center gap-4">
-                          <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group bg-orange-100">
+                          <div className="w-28 h-28 min-w-[7rem] bg-orange-100 rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
                             <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
                           </div>
                           <div className="flex-1 min-w-0"> 
