@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>B.O.D 包栈：极速包点师</title>
     
+    <!-- PWA 配置 -->
     <link rel="icon" type="image/png" href="assets/cover.png">
     <link rel="apple-touch-icon" href="assets/cover.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b91c1c">
     
+    <!-- 1. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 引入 React 和 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- 3. 样式定义 -->
     <style>
       @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
       @keyframes steam-rise { 0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; } 20% { opacity: 0.5; } 100% { transform: translateY(-60px) scale(1.5) rotate(10deg); opacity: 0; } }
@@ -54,7 +59,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare, Gift, Copy, Lock, Edit2, ExternalLink, ShoppingBag } from 'lucide-react';
+        import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare, Gift, Copy, Lock, ShoppingBag } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
@@ -63,6 +68,7 @@
         const GAME_DURATION = 90; 
         const FEVER_DURATION = 5000; 
 
+        // --- 奖励配置 ---
         const REWARDS_CONFIG = [
             { id: 'r1', score: 1000, title: '优秀学徒', discount: 'RM5 OFF', minSpend: 'Min Spend RM50', code: 'BN5', expiry: '31/12' },
             { id: 'r2', score: 2000, title: '高级包点师', discount: 'RM10 OFF', minSpend: 'Min Spend RM100', code: 'AM10', expiry: '31/12' },
@@ -257,6 +263,7 @@
 
           const bgmRef = useRef(null); 
           const victoryBgmRef = useRef(null); 
+          const introRef = useRef(null); // 新增：Intro 音乐
           const sfxPools = useRef({});
 
           const steamLockedRef = useRef(false);
@@ -291,6 +298,11 @@
               victoryBgmRef.current = new Audio('assets/victory.mp3');
               victoryBgmRef.current.loop = true;
               victoryBgmRef.current.volume = 0.4;
+              
+              // 新增 Intro 音乐初始化
+              introRef.current = new Audio('assets/intro.mp3');
+              introRef.current.loop = true;
+              introRef.current.volume = 0.4;
 
               const createPool = (src, size) => Array.from({length: size}, () => {
                   const a = new Audio(src);
@@ -308,6 +320,7 @@
                   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
                   if (bgmRef.current) { bgmRef.current.pause(); bgmRef.current = null; }
                   if (victoryBgmRef.current) { victoryBgmRef.current.pause(); victoryBgmRef.current = null; }
+                  if (introRef.current) { introRef.current.pause(); introRef.current = null; }
               };
           }, []);
 
@@ -323,28 +336,47 @@
               }
           };
 
+          // --- 音频状态管理优化 ---
           useEffect(() => {
-              if (!bgmRef.current || !victoryBgmRef.current) return;
+              if (!bgmRef.current || !victoryBgmRef.current || !introRef.current) return;
+
               if (isMuted) {
                   bgmRef.current.pause();
                   victoryBgmRef.current.pause();
+                  introRef.current.pause();
               } else {
-                  if (gameState === 'PLAYING') {
+                  // 状态判断
+                  if (gameState === 'MENU' || gameState === 'LEADERBOARD' || gameState === 'REWARDS') {
+                      // 播放 Intro
+                      bgmRef.current.pause();
+                      bgmRef.current.currentTime = 0;
                       victoryBgmRef.current.pause();
                       victoryBgmRef.current.currentTime = 0;
+                      
+                      if (introRef.current.paused) {
+                          const playPromise = introRef.current.play();
+                          if (playPromise !== undefined) playPromise.catch(() => {});
+                      }
+                  } else if (gameState === 'PLAYING') {
+                      // 播放游戏 BGM
+                      introRef.current.pause();
+                      introRef.current.currentTime = 0;
+                      victoryBgmRef.current.pause();
+                      victoryBgmRef.current.currentTime = 0;
+                      
                       const playPromise = bgmRef.current.play();
                       if (playPromise !== undefined) playPromise.catch(() => {});
                       bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
+
                   } else if (gameState === 'GAMEOVER') {
+                      // 播放胜利音乐
+                      introRef.current.pause();
+                      introRef.current.currentTime = 0;
                       bgmRef.current.pause();
                       bgmRef.current.currentTime = 0;
+
                       const playPromise = victoryBgmRef.current.play();
                       if (playPromise !== undefined) playPromise.catch(() => {});
-                  } else {
-                      bgmRef.current.pause();
-                      bgmRef.current.currentTime = 0;
-                      victoryBgmRef.current.pause();
-                      victoryBgmRef.current.currentTime = 0;
                   }
               }
           }, [gameState, isMuted, isFever]);
@@ -605,7 +637,7 @@
                     </div>
                 </div>
                 <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.0</span></div>
-                {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3><p className="text-gray-600 text-sm mb-4">请使用浏览器菜单中的“添加到主屏幕”功能。</p><button onClick={() => setShowInstallModal(false)} className="w-full bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
+                {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
               </div>
             );
           }
@@ -739,7 +771,7 @@
                   <>
                       <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
                         <div className="flex items-center gap-4">
-                          <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
+                          <div className="w-28 h-28 min-w-[7rem] flex items-center justify-center text-5xl relative group">
                             <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
                           </div>
                           <div className="flex-1 min-w-0"> 
