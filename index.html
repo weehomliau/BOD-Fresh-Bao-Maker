@@ -19,7 +19,7 @@
       @keyframes steam-rise { 0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; } 20% { opacity: 0.5; } 100% { transform: translateY(-60px) scale(1.5) rotate(10deg); opacity: 0; } }
       @keyframes shake-hard { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
       @keyframes pop-in { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
-      @keyframes steam-pump { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.02); } }
+      @keyframes steam-pump { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
       @keyframes fire-pulse { 0% { transform: scale(1); text-shadow: 0 0 2px orange; } 50% { transform: scale(1.2); text-shadow: 0 0 10px red; } 100% { transform: scale(1); text-shadow: 0 0 2px orange; } }
       @keyframes fever-bg { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
@@ -165,7 +165,7 @@
 
         const IngredientBtn = memo(({ ing, onClick, shouldHighlight }) => {
             return (
-                <button onPointerDown={(e) => { e.preventDefault(); onClick(ing); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-75 aspect-square overflow-hidden group relative btn-press ${shouldHighlight ? 'scale-105 bg-white border-gray-300 shadow-md z-10' : 'bg-gray-50 border-gray-100 hover:bg-gray-100 scale-100'}`}>
+                <button onPointerDown={(e) => { e.preventDefault(); onClick(ing); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-75 aspect-square overflow-hidden group relative btn-press bg-white/80 backdrop-blur-sm ${shouldHighlight ? 'scale-105 border-gray-300 shadow-md z-10' : 'border-gray-100 hover:bg-white scale-100'}`}>
                   <div className={`w-12 h-12 flex items-center justify-center mb-1`}><SafeImage key={ing.image} src={ing.image} alt={ing.name} className="w-full h-full object-contain" fallbackIcon={<span className="text-3xl">{ing.icon}</span>} /></div>
                   <span className={`text-xs font-medium leading-tight text-center ${shouldHighlight ? 'font-bold text-gray-800' : 'text-gray-600'}`}>{ing.name}</span>
                 </button>
@@ -201,7 +201,7 @@
                      <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" style={{ clipPath: `polygon(50% 50%, ${100-progress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
                      <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full pointer-events-none">{progress}%</div>
                    </div>
-                   <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm pointer-events-none">疯狂点击包子！</p>
+                   <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm pointer-events-none bg-white/60 px-2 rounded backdrop-blur-sm">疯狂点击包子！</p>
                    <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-yellow-500 transition-all duration-75" style={{ width: `${progress}%` }}></div></div>
                 </div>
             );
@@ -628,20 +628,12 @@
 
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
-                {/* 主菜单：全屏背景 + Logo图 */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop min-h-0">
                     
-                    {/* 背景图层：街道图 bg.png (如果用户上传了) */}
-                    <div className="absolute inset-0 z-0 opacity-30">
-                         <SafeImage 
-                             src="assets/bg.png" 
-                             alt="" 
-                             className="w-full h-full object-cover"
-                             fallbackIcon={<div className="w-full h-full bg-orange-50"></div>}
-                         />
-                    </div>
+                    {/* 1. 首页不再显示背景图，只保留渐变 */}
+                    
 
-                    {/* 封面容器：去掉白色卡片，直接展示贴图 */}
+                    {/* 2. 封面图 */}
                     <div className="w-full flex-1 min-h-0 mb-6 relative flex items-center justify-center z-10">
                         <SafeImage 
                             src="assets/cover.png" 
@@ -666,14 +658,12 @@
                         <button onClick={handleInstallClick} className="w-full bg-white/80 hover:bg-white text-neutral-800 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#d4d4d4] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-gray-300"><Download size={20} /> 添加到主屏幕</button>
                     </div>
                 </div>
-                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V0.26 (美术适配版)</span></div>
+                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.3 (Final)</span></div>
                 {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
               </div>
             );
           }
 
-          // ... 其他状态代码不变 (LEADERBOARD, REWARDS, GAMEOVER, PLAYING) ...
-          // 为确保完整性，请复制 V0.25 的其余部分代码
           if (gameState === 'REWARDS') {
              return (
                <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
@@ -770,7 +760,17 @@
 
           return (
             <div className={`h-full w-full flex flex-col font-sans overflow-hidden ${isFever ? 'animate-fever-bg bg-gradient-to-br from-red-600 via-yellow-500 to-red-600' : ''}`}>
-              <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 ${isFever ? 'bg-transparent' : (timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700')}`}>
+              
+              <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+                   <SafeImage 
+                       src="assets/bg.png" 
+                       alt="" 
+                       className="w-full h-full object-cover"
+                       fallbackIcon={<div className="w-full h-full bg-orange-50"></div>}
+                   />
+              </div>
+
+              <div className={`text-white px-3 py-1 flex flex-col shadow-md z-10 transition-colors duration-500 shrink-0 relative ${isFever ? 'bg-transparent' : (timeLeft < 10 ? 'bg-red-800 animate-shake-hard' : 'bg-red-700')}`}>
                 <div className="flex justify-between items-center h-8">
                     <div className="flex items-center gap-2 font-bold text-base">
                         <button onClick={() => setIsMuted(!isMuted)} className="p-1 rounded-full hover:bg-white/20 transition-colors">{isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
@@ -783,7 +783,7 @@
               </div>
 
               {isFever ? (
-                  <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6 animate-pop gpu-accel">
+                  <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6 animate-pop gpu-accel relative z-10">
                       <div className="text-white/90 text-center text-sm font-bold tracking-widest mb-2">疯狂交替点击！+1分</div>
                       <div className="flex gap-4 w-full h-64">
                           <button onPointerDown={(e) => handleFeverClick('left', e)} className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}><span className="text-6xl group-active:scale-125 transition-transform">🥟</span><span className="text-2xl font-black text-orange-600">捏包</span></button>
@@ -793,7 +793,7 @@
                   </div>
               ) : (
                   <>
-                      <div className="bg-white p-4 border-b border-gray-200 relative z-0 shadow-sm shrink-0">
+                      <div className="bg-white p-4 border-b border-gray-200 relative z-10 shadow-sm shrink-0">
                         <div className="flex items-center gap-4">
                           <div className="w-28 h-28 min-w-[7rem] rounded-xl flex items-center justify-center text-5xl shadow-inner border border-orange-200 overflow-hidden relative group">
                             <SafeImage src={currentOrder.image} alt={currentOrder.name} className="w-full h-full object-contain transition-transform group-hover:scale-110 drop-shadow-xl" fallbackIcon={currentOrder.icon} />
@@ -812,7 +812,7 @@
                         </div>
                       </div>
 
-                      <div className="flex-1 bg-neutral-100 relative overflow-y-auto flex flex-col">
+                      <div className="flex-1 relative overflow-y-auto flex flex-col z-10">
                         {feedback && (<div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold flex items-center gap-2 animate-bounce ${getFeedbackColor()}`}>{feedback.type === 'success' ? <CheckCircle size={20}/> : <XCircle size={20}/>}{feedback.msg}</div>)}
                         <div className="flex-1 flex flex-col items-center justify-center p-2 transition-all perspective-[1000px] h-full min-h-[300px]">
                           {cookingStep === 'PREP' && (
