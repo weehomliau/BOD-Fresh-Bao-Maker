@@ -230,7 +230,7 @@
           { id: 'bbq_bun', name: '御品叉烧包', description: '独家秘制酱汁', ingredients: ['面团', '秘制叉烧'], color: 'bg-red-50', icon: <span className="text-4xl">🍖</span>, image: "assets/bbq_bun.png", difficulty: 1 },
           { id: 'lava_bun', name: '咸蛋流沙包', description: '爆浆口感', ingredients: ['面团', '咸蛋黄流沙'], color: 'bg-yellow-100', icon: <span className="text-4xl">🥚</span>, image: "assets/lava_bun.png", difficulty: 1 },
           { id: 'mei_cai_bun', name: '梅菜包', description: '经典客家风味', ingredients: ['面团', '梅菜'], color: 'bg-green-50', icon: <span className="text-4xl">🥬</span>, image: "assets/mei_cai_bun.png", difficulty: 1 },
-          { id: 'cheese_pot', name: '香香起司窝', description: '年轻人的最爱', ingredients: ['面团', '芝士碎', '培根'], color: 'bg-yellow-50', icon: <span className="text-4xl">🧀</span>, image: "assets/cheese_bun.png", difficulty: 2 },
+          { id: 'cheese_pot', name: '香香起司窝', description: '年轻人的最爱', ingredients: ['面团', '起司碎', '台湾香肠'], color: 'bg-yellow-50', icon: <span className="text-4xl">🧀</span>, image: "assets/cheese_bun.png", difficulty: 2 },
           { id: 'red_bean_bun', name: '豆沙包', description: '经典红豆', ingredients: ['面团', '天津红豆'], color: 'bg-red-50', icon: <span className="text-4xl">🫘</span>, image: "assets/red_bean_bun.png", difficulty: 1 }
         ];
 
@@ -242,8 +242,8 @@
           { id: '花雕酒', name: '陈年花雕', icon: '🍶', image: "assets/wine.png" }, 
           { id: '咸蛋黄流沙', name: '流沙馅', icon: '🥚', image: "assets/salted_egg.png" },
           { id: '梅菜', name: '梅菜', icon: '🥘', image: "assets/mei_cai.png" },
-          { id: '芝士碎', name: '起司', icon: '🧀', image: "assets/cheese.png" }, 
-          { id: '培根', name: '烟熏培根', icon: '🥓', image: "assets/bacon.png" },
+          { id: '起司碎', name: '起司碎', icon: '🧀', image: "assets/cheese.png" }, 
+          { id: '台湾香肠', name: '台湾香肠', icon: '🌭', image: "assets/sausage.png" },
           { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "assets/red_bean_paste.png" },
         ];
 
@@ -273,9 +273,6 @@
           const [newRewardUnlocked, setNewRewardUnlocked] = useState(null);
           const [isMuted, setIsMuted] = useState(false);
 
-          // 核心修复：添加 gameStateRef 用于解决闭包陷阱
-          const gameStateRef = useRef(gameState); 
-          
           const bgmRef = useRef(null); 
           const victoryBgmRef = useRef(null); 
           const introRef = useRef(null); 
@@ -284,11 +281,6 @@
           const steamLockedRef = useRef(false);
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
-          
-          // 同步 State 到 Ref
-          useEffect(() => {
-              gameStateRef.current = gameState;
-          }, [gameState]);
 
           useEffect(() => {
               const isDeviceIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -334,11 +326,10 @@
               };
 
               const unlockAudio = () => {
-                 // 使用 Ref 来判断当前是否在 MENU 状态，解决闭包问题
-                 if (gameStateRef.current === 'MENU' && introRef.current && introRef.current.paused && !isMuted) {
+                 if (bgmRef.current) {}
+                 if (gameState === 'MENU' && introRef.current && introRef.current.paused && !isMuted) {
                      introRef.current.play().catch(()=>{});
                  }
-                 // 移除监听器，只需触发一次
                  document.removeEventListener('click', unlockAudio);
                  document.removeEventListener('touchstart', unlockAudio);
               };
@@ -485,7 +476,6 @@
           };
 
           const startGame = () => {
-             // 关键修复：点击开始时，立刻强制停止 Intro 音乐
              if (introRef.current) {
                  introRef.current.pause();
                  introRef.current.currentTime = 0;
@@ -717,25 +707,12 @@
                         </div>
                     </div>
                 </div>
-                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.0 (Final)</span></div>
+                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.3.1 (Share)</span></div>
                 {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
               </div>
             );
           }
 
-          // ... REWARDS, LEADERBOARD, GAMEOVER, PLAYING ...
-          // 为了确保代码完整性，请保留之前生成的 REWARDS, LEADERBOARD, GAMEOVER, PLAYING 的渲染代码块。
-          // 之前的 V1.3.1 代码块逻辑是正确的，只是末尾可能缺了闭合。
-          
-          // 此处不再重复粘贴中间未改动的大段代码，以避免再次超出长度。
-          // 请确保 index.html 的结构是：
-          // if (gameState === 'MENU') { ... }
-          // if (gameState === 'REWARDS') { ... }
-          // if (gameState === 'LEADERBOARD') { ... }
-          // if (gameState === 'GAMEOVER') { ... }
-          // if (!currentOrder && gameState === 'PLAYING') ...
-          // return ( ... PLAYING 界面 ... )
-          
           if (gameState === 'REWARDS') {
              return (
                <div className="h-full w-full flex flex-col items-center p-4 bg-neutral-900 text-white overflow-hidden">
