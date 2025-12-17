@@ -30,13 +30,11 @@
       .animate-pump { animation: steam-pump 1s ease-in-out infinite; }
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
       .animate-fever-bg { background-size: 200% 200%; animation: fever-bg 1s ease infinite; }
-      
-      /* 圣诞飘雪动画 */
+      .animate-snow { animation: snow linear infinite; }
       @keyframes snow { 
           0% { transform: translateY(-10px) translateX(-5px) rotate(0deg); opacity: 0.8; } 
           100% { transform: translateY(110vh) translateX(5px) rotate(360deg); opacity: 0.2; } 
       }
-      .animate-snow { animation: snow linear infinite; }
       
       .gpu-accel { transform: translate3d(0,0,0); will-change: transform; }
       
@@ -233,11 +231,15 @@
             );
         });
 
-        // --- 性能优化组件：独立的蒸笼 (Steaming Isolation) ---
-        const SteamingStage = memo(({ score, onFinish }) => {
+        // --- 修复重点：蒸笼组件逻辑重构 ---
+        const SteamingStage = memo(({ score, onFinish, playSfx }) => {
             const [progress, setProgress] = useState(0);
+            const [isStopped, setIsStopped] = useState(false); // UI冻结状态
             const timerRef = useRef(null);
-            const lockedRef = useRef(false);
+            const lockedRef = useRef(false); // 逻辑锁
+            const onFinishRef = useRef(onFinish); // 避免 useEffect 依赖更新
+
+            useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
 
             useEffect(() => {
                 const speed = 2 + Math.floor(score / 500) * 0.3;
@@ -246,32 +248,45 @@
                         const next = p + speed;
                         if (next > 120) {
                             clearInterval(timerRef.current);
-                            onFinish(false, '🔥 蒸糊了！太久了！');
+                            if (!lockedRef.current) {
+                                lockedRef.current = true;
+                                setIsStopped(true);
+                                onFinishRef.current(false, '🔥 蒸糊了！太久了！');
+                            }
                             return 120;
                         }
                         return next;
                     });
                 }, 50);
                 return () => clearInterval(timerRef.current);
-            }, [score, onFinish]);
+            }, [score]);
 
             const handleStop = (e) => {
                 e.preventDefault(); e.stopPropagation();
                 if (lockedRef.current) return;
+                
                 lockedRef.current = true;
+                setIsStopped(true); // 立即停止视觉动画
                 clearInterval(timerRef.current);
-                if (progress >= 80 && progress <= 100) onFinish(true, '✨ 完美出炉！');
-                else if (progress < 80) onFinish(false, '❄️ 还没熟！里面是生的！');
-                else onFinish(false, '🔥 蒸过头了！皮老了！');
+                
+                playSfx('pop');
+
+                if (progress >= 80 && progress <= 100) onFinishRef.current(true, '✨ 完美出炉！');
+                else if (progress < 80) onFinishRef.current(false, '❄️ 还没熟！里面是生的！');
+                else onFinishRef.current(false, '🔥 蒸过头了！皮老了！');
             };
 
             return (
                 <div className="flex flex-col items-center w-full justify-center h-full">
                    <div className="relative w-64 h-64 flex items-center justify-center">
-                      <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center text-5xl opacity-0 animate-steam">☁️</div>
-                      <div className="w-full h-full relative animate-pump gpu-accel">
+                      {/* 停止时隐藏蒸汽 */}
+                      {!isStopped && <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center text-5xl opacity-0 animate-steam">☁️</div>}
+                      
+                      {/* 停止时暂停跳动 */}
+                      <div className={`w-full h-full relative gpu-accel ${isStopped ? '' : 'animate-pump'}`}>
                          <SafeImage src="./assets/steamer.png" alt="Steamer" className="w-full h-full object-contain" fallbackIcon={<span className="text-6xl">♨️</span>} />
                       </div>
+                      
                       <div className="absolute right-2 bottom-4 w-6 h-40 bg-gray-200 rounded-full border-2 border-gray-300 shadow-xl overflow-hidden backdrop-blur-sm bg-opacity-90 z-20">
                             <div className="absolute right-0 top-[20%] w-full h-0.5 bg-green-500 z-20 shadow-[0_0_4px_rgba(34,197,94,0.8)]"></div>
                             <div className="absolute right-0 top-[0%] w-full h-0.5 bg-red-500 z-20"></div>
@@ -280,7 +295,13 @@
                             <div className="absolute right-0 top-[30%] w-1.5 h-px bg-gray-400"></div><div className="absolute right-0 top-[70%] w-1.5 h-px bg-gray-400"></div>
                       </div>
                    </div>
-                   <button onPointerDown={handleStop} className="mt-8 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] active:shadow-none active:translate-y-1 transition-all btn-press">立即出炉!</button>
+                   <button 
+                     onPointerDown={handleStop} 
+                     disabled={isStopped}
+                     className={`mt-8 text-white font-bold py-3 px-10 rounded-full text-lg shadow-[0_4px_0_#991b1b] transition-all btn-press ${isStopped ? 'bg-gray-400 cursor-not-allowed shadow-none transform-none' : 'bg-gradient-to-r from-red-600 to-red-500 active:shadow-none active:translate-y-1'}`}
+                   >
+                     {isStopped ? '出炉中...' : '立即出炉!'}
+                   </button>
                    <p className="mt-2 text-[10px] text-gray-500 font-bold bg-white/60 px-2 rounded backdrop-blur-sm">绿色刻度点击</p>
                 </div>
             );
@@ -307,22 +328,15 @@
           { id: '台湾香肠', name: '台湾香肠', icon: '🌭', image: "assets/sausage.png" },
           { id: '天津红豆', name: '天津红豆', icon: '🫘', image: "assets/red_bean_paste.png" },
         ];
-        
-        // --- 预加载资源列表 (Preloader) ---
-        const ASSETS_TO_PRELOAD = [
-            'assets/cover.png', 'assets/bg.png', 'assets/steamer.png', 'assets/folding_bun.png',
-            ...RECIPES.map(r => r.image),
-            ...INGREDIENTS_POOL.map(i => i.image)
-        ];
 
         function BODGame() {
-          const [gameState, setGameState] = useState('LOADING'); // Start with LOADING
+          const [gameState, setGameState] = useState('MENU'); 
           const [score, setScore] = useState(0);
           const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
           const [currentOrder, setCurrentOrder] = useState(null);
           const [worktable, setWorktable] = useState([]); 
           const [cookingStep, setCookingStep] = useState('PREP'); 
-          // steamProgress moved to SteamingStage component
+          const [steamProgress, setSteamProgress] = useState(0); 
           const [feedback, setFeedback] = useState(null); 
           const [playerName, setPlayerName] = useState('');
           const [isScoreSaved, setIsScoreSaved] = useState(false);
@@ -331,6 +345,7 @@
           
           const [combo, setCombo] = useState(0); 
           const [isFever, setIsFever] = useState(false);
+          const [feverClickAnim, setFeverClickAnim] = useState(null); 
           
           const [deferredPrompt, setDeferredPrompt] = useState(null);
           const [showInstallModal, setShowInstallModal] = useState(false);
@@ -339,7 +354,6 @@
           const [unlockedRewards, setUnlockedRewards] = useState([]);
           const [newRewardUnlocked, setNewRewardUnlocked] = useState(null);
           const [isMuted, setIsMuted] = useState(false);
-          const [loadedAssets, setLoadedAssets] = useState(0);
 
           const gameStateRef = useRef(gameState); 
           
@@ -347,9 +361,15 @@
           const victoryBgmRef = useRef(null); 
           const introRef = useRef(null); 
           const sfxPools = useRef({});
-          const timerRef = useRef(null);
 
-          // --- Preloader & Init ---
+          const steamLockedRef = useRef(false);
+          const timerRef = useRef(null);
+          const steamTimerRef = useRef(null);
+          
+          useEffect(() => {
+              gameStateRef.current = gameState;
+          }, [gameState]);
+
           useEffect(() => {
               const isDeviceIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
               setIsIOS(isDeviceIOS);
@@ -369,60 +389,32 @@
               const savedRewards = JSON.parse(localStorage.getItem('bod_rewards') || '[]');
               setUnlockedRewards(savedRewards);
 
-              // Preloader Logic
-              let loaded = 0;
-              // Audio files to preload manually via buffer
-              const audioFiles = ['pop', 'win', 'lose'];
-              const total = ASSETS_TO_PRELOAD.length + audioFiles.length;
-              
-              const checkDone = () => {
-                  loaded++;
-                  setLoadedAssets(Math.floor((loaded / total) * 100));
-                  if (loaded >= total) {
-                      setTimeout(() => setGameState('MENU'), 500);
-                  }
-              };
-
-              // Load Images
-              ASSETS_TO_PRELOAD.forEach(src => {
-                  const img = new Image();
-                  img.onload = checkDone; 
-                  img.onerror = checkDone; 
-                  img.src = src;
-              });
-
-              // Load Audio Context Buffers
-              if (AudioContext) {
-                 const ctx = new AudioContext();
-                 const loadBuffer = async (url, name) => {
-                      try {
-                          const r = await fetch(url);
-                          const b = await r.arrayBuffer();
-                          const d = await ctx.decodeAudioData(b);
-                          if(!sfxPools.current[name]) sfxPools.current[name] = [];
-                          for(let i=0; i<5; i++) sfxPools.current[name].push({buffer: d, ctx}); 
-                      } catch(e) { console.warn(e); }
-                      checkDone();
-                 };
-                 loadBuffer('assets/pop.mp3', 'pop');
-                 loadBuffer('assets/win.mp3', 'win');
-                 loadBuffer('assets/lose.mp3', 'lose');
-              } else {
-                 // Skip audio loading if not supported
-                 loaded += 3; checkDone(); checkDone(); checkDone();
-              }
-
-              // HTML Audio Elements (Streams)
               bgmRef.current = new Audio('assets/bgm.mp3');
               bgmRef.current.loop = true;
-              
+              bgmRef.current.volume = 0.3;
+
               victoryBgmRef.current = new Audio('assets/victory.mp3');
               victoryBgmRef.current.loop = true;
-              
+              victoryBgmRef.current.volume = 0.4;
+
               introRef.current = new Audio('assets/intro.mp3');
               introRef.current.loop = true;
-              
+              introRef.current.volume = 0.4;
+
+              const createPool = (src, size) => Array.from({length: size}, () => {
+                  const a = new Audio(src);
+                  a.load();
+                  return a;
+              });
+
+              sfxPools.current = {
+                  pop: createPool('assets/pop.mp3', 10),
+                  win: createPool('assets/win.mp3', 10),
+                  lose: createPool('assets/lose.mp3', 3),
+              };
+
               const unlockAudio = () => {
+                 if (bgmRef.current) {}
                  if (gameStateRef.current === 'MENU' && introRef.current && introRef.current.paused && !isMuted) {
                      introRef.current.play().catch(()=>{});
                  }
@@ -441,67 +433,6 @@
                   document.removeEventListener('touchstart', unlockAudio);
               };
           }, []);
-          
-          useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
-
-          // Audio Volume & State Management
-          useEffect(() => {
-              if (!bgmRef.current || !victoryBgmRef.current || !introRef.current) return;
-
-              bgmRef.current.volume = 0.3; 
-              victoryBgmRef.current.volume = 0.4; 
-              introRef.current.volume = 0.4;
-
-              if (isMuted) {
-                  bgmRef.current.pause();
-                  victoryBgmRef.current.pause();
-                  introRef.current.pause();
-              } else {
-                  if (gameState === 'MENU' || gameState === 'LEADERBOARD' || gameState === 'REWARDS') {
-                      bgmRef.current.pause();
-                      victoryBgmRef.current.pause();
-                      if (introRef.current.paused) {
-                          introRef.current.currentTime = 0;
-                          introRef.current.play().catch(()=>{});
-                      }
-                  } else if (gameState === 'PLAYING') {
-                      introRef.current.pause();
-                      victoryBgmRef.current.pause();
-                      if (bgmRef.current.paused) {
-                          bgmRef.current.currentTime = 0;
-                          bgmRef.current.play().catch(()=>{});
-                      }
-                      bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
-                  } else if (gameState === 'GAMEOVER') {
-                      introRef.current.pause();
-                      bgmRef.current.pause();
-                      if (victoryBgmRef.current.paused) {
-                           victoryBgmRef.current.currentTime = 0;
-                           victoryBgmRef.current.play().catch(()=>{});
-                      }
-                  }
-              }
-          }, [gameState, isMuted, isFever]);
-
-          const playSfx = useCallback((name) => {
-              if (isMuted || !sfxPools.current[name]) return;
-              const pool = sfxPools.current[name];
-              if (pool && pool.length > 0) {
-                  // Round robin or find free? Web Audio handles multiple concurrent sources fine.
-                  // Just create a new source from the buffer we loaded.
-                  // We stored {buffer, ctx} in the pool.
-                  const item = pool[0]; // Use first context/buffer ref
-                  if (item.ctx.state === 'suspended') item.ctx.resume();
-                  
-                  const source = item.ctx.createBufferSource();
-                  source.buffer = item.buffer;
-                  const gain = item.ctx.createGain();
-                  gain.gain.value = 1.0;
-                  source.connect(gain);
-                  gain.connect(item.ctx.destination);
-                  source.start(0);
-              }
-          }, [isMuted]);
 
           const handleInstallClick = () => {
               if (deferredPrompt) {
@@ -521,12 +452,64 @@
                   text: `我在B.O.D极速包点师挑战了 ${score} 分！快来试试你的手速！`,
                   url: window.location.href
               };
+
               if (navigator.share) {
-                  try { await navigator.share(shareData); } catch (err) { console.log('Share canceled'); }
+                  try {
+                      await navigator.share(shareData);
+                  } catch (err) {
+                      console.log('Share canceled');
+                  }
               } else {
                   copyToClipboard(window.location.href);
               }
           };
+
+          useEffect(() => {
+              if (!bgmRef.current || !victoryBgmRef.current || !introRef.current) return;
+
+              if (isMuted) {
+                  bgmRef.current.pause();
+                  victoryBgmRef.current.pause();
+                  introRef.current.pause();
+              } else {
+                  if (gameState === 'MENU' || gameState === 'LEADERBOARD' || gameState === 'REWARDS') {
+                      bgmRef.current.pause();
+                      victoryBgmRef.current.pause();
+                      if (introRef.current.paused) {
+                          introRef.current.currentTime = 0;
+                          const p = introRef.current.play();
+                          if (p) p.catch(()=>{});
+                      }
+                  } else if (gameState === 'PLAYING') {
+                      introRef.current.pause();
+                      victoryBgmRef.current.pause();
+                      if (bgmRef.current.paused) {
+                          bgmRef.current.currentTime = 0;
+                          const p = bgmRef.current.play();
+                          if(p) p.catch(()=>{});
+                      }
+                      bgmRef.current.playbackRate = isFever ? 1.5 : 1.0;
+
+                  } else if (gameState === 'GAMEOVER') {
+                      introRef.current.pause();
+                      bgmRef.current.pause();
+                      if (victoryBgmRef.current.paused) {
+                           victoryBgmRef.current.currentTime = 0;
+                           const p = victoryBgmRef.current.play();
+                           if(p) p.catch(()=>{});
+                      }
+                  }
+              }
+          }, [gameState, isMuted, isFever]);
+
+          const playSfx = useCallback((name) => {
+              if (isMuted || !sfxPools.current[name]) return;
+              const pool = sfxPools.current[name];
+              const sound = pool.find(s => s.paused) || pool[0];
+              sound.currentTime = 0;
+              sound.volume = 1.0;
+              sound.play().catch(() => {});
+          }, [isMuted]);
 
           useEffect(() => {
             if (gameState === 'PLAYING' && !isFever) {
@@ -558,6 +541,7 @@
             setCurrentOrder(randomRecipe);
             setWorktable([]);
             setCookingStep('PREP');
+            setSteamProgress(0);
           };
 
           const startFeverMode = () => {
@@ -575,6 +559,8 @@
               if(e) { e.preventDefault(); e.stopPropagation(); }
               playSfx('win'); 
               setScore(prev => prev + 1);
+              setFeverClickAnim(side);
+              setTimeout(() => setFeverClickAnim(null), 50); 
           };
 
           const startGame = () => {
@@ -582,6 +568,7 @@
                  introRef.current.pause();
                  introRef.current.currentTime = 0;
              }
+             
              setScore(0);
              setCombo(0); 
              setIsFever(false);
@@ -612,6 +599,7 @@
 
           const endGame = () => {
             clearInterval(timerRef.current);
+            clearInterval(steamTimerRef.current);
             setIsFever(false);
             checkAndUnlockRewards(score);
             setGameState('GAMEOVER');
@@ -669,7 +657,7 @@
           const handleFoldComplete = useCallback(() => {
             setCookingStep('STEAMING');
             showFeedback('🥟 造型完美！放入蒸笼！', 'success');
-            // Steaming auto-starts by mounting SteamingStage component
+            // startSteaming moved inside SteamingStage component
           }, []);
 
           // Callback from SteamingStage component
@@ -727,17 +715,6 @@
               });
           };
 
-          // --- 渲染逻辑 ---
-
-          if (gameState === 'LOADING') {
-              return (
-                  <div className="h-full w-full flex flex-col items-center justify-center bg-orange-50 font-sans">
-                      <div className="animate-spin text-red-600 mb-4"><Loader2 size={48} /></div>
-                      <p className="text-gray-600 font-bold">资源加载中 {loadedAssets}%...</p>
-                  </div>
-              );
-          }
-
           if (gameState === 'MENU') {
             return (
               <div className="h-full w-full flex flex-col items-center justify-between p-6 font-sans relative overflow-hidden bg-orange-50">
@@ -747,12 +724,14 @@
                     </button>
                 </div>
 
+                {/* 圣诞雪花特效 - MENU */}
                 <Snowfall />
 
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop min-h-0">
                     
+                    {/* 2. 封面图 */}
                     <div className="w-full flex-1 min-h-0 mb-6 relative flex items-center justify-center z-10">
                         <div className="relative w-full h-full flex justify-center items-center">
                             <SafeImage 
@@ -768,11 +747,13 @@
                                     </div>
                                 }
                             />
+                            {/* 圣诞装饰：封面上的帽子和树 */}
                             <div className="absolute -top-4 -right-2 text-6xl transform rotate-12 drop-shadow-lg z-20 pointer-events-none filter hue-rotate-15">🎅🏻</div>
                             <div className="absolute bottom-4 -left-4 text-5xl transform -rotate-12 drop-shadow-lg z-20 pointer-events-none">🎄</div>
                         </div>
                     </div>
 
+                    {/* 按钮 */}
                     <div className="w-full space-y-4 px-4 shrink-0 z-10">
                         <button onClick={startGame} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 px-6 rounded-2xl text-xl shadow-[0_6px_0_#991b1b] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-3 border-2 border-red-700"><Utensils className="animate-bounce" size={24} /> 开始制作</button>
                         <button onClick={() => setGameState('LEADERBOARD')} className="w-full bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#ca8a04] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-yellow-500"><Trophy size={20} /> 大师排行榜</button>
@@ -783,7 +764,7 @@
                         </div>
                     </div>
                 </div>
-                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.4 (Preload)</span></div>
+                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.6 (Fixed)</span></div>
                 {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
               </div>
             );
