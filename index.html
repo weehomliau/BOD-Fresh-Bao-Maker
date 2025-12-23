@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>B.O.D 包栈：极速包点师</title>
+    <title>B.O.D 包栈：极速包点师 (稳定版)</title>
     
     <link rel="icon" type="image/png" href="assets/cover.png">
     <link rel="apple-touch-icon" href="assets/cover.png">
@@ -22,6 +22,8 @@
       @keyframes steam-pump { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
       @keyframes fire-pulse { 0% { transform: scale(1); text-shadow: 0 0 2px orange; } 50% { transform: scale(1.2); text-shadow: 0 0 10px red; } 100% { transform: scale(1); text-shadow: 0 0 2px orange; } }
       @keyframes fever-bg { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+      /* 新增：雪花动画定义 */
+      @keyframes snow { 0% { transform: translateY(-20px) translateX(0); } 100% { transform: translateY(100vh) translateX(20px); } }
 
       .animate-float { animation: float 6s ease-in-out infinite; }
       .animate-steam { animation: steam-rise 2.5s ease-out infinite; }
@@ -30,6 +32,8 @@
       .animate-pump { animation: steam-pump 1s ease-in-out infinite; }
       .animate-combo { animation: fire-pulse 0.3s ease-in-out; }
       .animate-fever-bg { background-size: 200% 200%; animation: fever-bg 1s ease infinite; }
+      /* 新增：应用雪花动画类 */
+      .animate-snow { animation: snow linear infinite; }
       
       .gpu-accel { transform: translate3d(0,0,0); will-change: transform; }
       
@@ -57,7 +61,6 @@
         import { ChefHat, Timer, Trophy, Flame, Utensils, RotateCcw, XCircle, CheckCircle, User, ArrowLeft, Crown, Globe, Sparkles, Trash2, Loader2, Zap, Clock, Volume2, VolumeX, Download, Share, PlusSquare, Gift, Copy, Lock, ShoppingBag } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-        // 修改：引入 logEvent 用于手动记录事件
         import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
         import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, where, updateDoc, doc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
@@ -81,13 +84,13 @@
         };
 
         let db = null;
-        let analytics = null; // 声明 analytics
+        let analytics = null;
         let isOnline = false;
 
         if (firebaseConfig.apiKey && firebaseConfig.projectId) {
             try {
                 const app = initializeApp(firebaseConfig);
-                analytics = getAnalytics(app); // 初始化 analytics
+                analytics = getAnalytics(app);
                 db = getFirestore(app);
                 isOnline = true;
             } catch (e) {
@@ -195,17 +198,27 @@
 
         const FoldingStage = memo(({ onComplete, playSfx }) => {
             const [progress, setProgress] = useState(0);
-            const isCompletedRef = useRef(false); 
+            const isCompletedRef = useRef(false);
+            const lastClickTimeRef = useRef(0); 
 
             const handlePointerDown = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (isCompletedRef.current) return; 
+                
+                // 保留：检测点击频率 (40ms内再次点击视为脚本)，不影响视觉但能防止机器
+                const now = Date.now();
+                if (now - lastClickTimeRef.current < 40) return;
+                lastClickTimeRef.current = now;
+
+                if (isCompletedRef.current) return;
                 playSfx('pop');
+
+                // 移除：位置瞬移逻辑已删除，包子现在保持静止
+
                 setProgress(prev => {
                     const next = prev + 15;
                     if (next >= 100) {
-                        isCompletedRef.current = true; 
+                        isCompletedRef.current = true;
                         setTimeout(() => onComplete(), 0);
                         return 100;
                     }
@@ -216,14 +229,21 @@
             useEffect(() => { isCompletedRef.current = false; setProgress(0); }, []);
 
             return (
-                <div className="flex flex-col items-center justify-center w-full h-full">
-                   <div className="w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer relative overflow-hidden btn-press gpu-accel" onPointerDown={handlePointerDown}>
+                <div className="flex flex-col items-center justify-center w-full h-full relative overflow-hidden">
+                    <div className="absolute inset-0 z-0"></div>
+
+                   <div 
+                        className="w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer relative overflow-hidden btn-press gpu-accel z-10 transition-transform duration-75 ease-out" 
+                        onPointerDown={handlePointerDown}
+                        // 移除：transform 属性已删除
+                   >
                      <SafeImage src="assets/folding_bun.png" alt="Raw Bun" className="w-full h-full object-cover pointer-events-none" fallbackIcon={<div className="text-6xl">⚪</div>} />
                      <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" style={{ clipPath: `polygon(50% 50%, ${100-progress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
                      <div className="absolute bottom-4 text-[10px] font-bold text-orange-800 bg-white/50 px-2 rounded-full pointer-events-none">{progress}%</div>
                    </div>
-                   <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm pointer-events-none bg-white/60 px-2 rounded backdrop-blur-sm">疯狂点击包子！</p>
-                   <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-yellow-500 transition-all duration-75" style={{ width: `${progress}%` }}></div></div>
+                   
+                   <p className="mt-4 text-gray-500 font-bold animate-pulse text-sm pointer-events-none bg-white/60 px-2 rounded backdrop-blur-sm z-20 shadow-sm">疯狂点击包子！</p>
+                   <div className="w-40 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner z-20"><div className="h-full bg-yellow-500 transition-all duration-75" style={{ width: `${progress}%` }}></div></div>
                 </div>
             );
         });
@@ -287,7 +307,9 @@
           const timerRef = useRef(null);
           const steamTimerRef = useRef(null);
           
-          // 深度追踪：GameState 变更记录
+          // 保留：Fever 模式下的点击频率限制
+          const lastFeverClickTime = useRef(0);
+          
           useEffect(() => {
               gameStateRef.current = gameState;
               if (analytics) {
@@ -342,12 +364,12 @@
               };
 
               const unlockAudio = () => {
-                 if (bgmRef.current) {}
-                 if (gameStateRef.current === 'MENU' && introRef.current && introRef.current.paused && !isMuted) {
-                     introRef.current.play().catch(()=>{});
-                 }
-                 document.removeEventListener('click', unlockAudio);
-                 document.removeEventListener('touchstart', unlockAudio);
+                  if (bgmRef.current) {}
+                  if (gameStateRef.current === 'MENU' && introRef.current && introRef.current.paused && !isMuted) {
+                      introRef.current.play().catch(()=>{});
+                  }
+                  document.removeEventListener('click', unlockAudio);
+                  document.removeEventListener('touchstart', unlockAudio);
               };
               document.addEventListener('click', unlockAudio);
               document.addEventListener('touchstart', unlockAudio);
@@ -485,6 +507,12 @@
 
           const handleFeverClick = (side, e) => {
               if(e) { e.preventDefault(); e.stopPropagation(); }
+              
+              // 保留：频率限制 (40ms)
+              const now = Date.now();
+              if (now - lastFeverClickTime.current < 40) return;
+              lastFeverClickTime.current = now;
+
               playSfx('win'); 
               setScore(prev => prev + 1);
               setFeverClickAnim(side);
@@ -686,14 +714,12 @@
                     </button>
                 </div>
 
-                {/* 圣诞雪花特效 - MENU */}
                 <Snowfall />
 
                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#fbbf24 2px, transparent 2px)', backgroundSize: '30px 30px'}}></div>
 
                 <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm z-10 animate-pop min-h-0">
                     
-                    {/* 2. 封面图 */}
                     <div className="w-full flex-1 min-h-0 mb-6 relative flex items-center justify-center z-10">
                         <div className="relative w-full h-full flex justify-center items-center">
                             <SafeImage 
@@ -702,20 +728,18 @@
                                 className="max-h-full max-w-full object-contain drop-shadow-2xl" 
                                 fallbackIcon={
                                     <div className="text-center p-8 bg-white/80 backdrop-blur rounded-3xl shadow-xl border-4 border-orange-200">
-                                        <ChefHat size={80} className="text-red-600 mx-auto mb-4" />
-                                        <h1 className="text-3xl font-black text-red-800">B.O.D 包栈</h1>
-                                        <p className="text-orange-600 font-bold mt-2">极速包点师</p>
-                                        <p className="text-xs text-gray-400 mt-2">等待图片上传: assets/cover.png</p>
+                                            <ChefHat size={80} className="text-red-600 mx-auto mb-4" />
+                                            <h1 className="text-3xl font-black text-red-800">B.O.D 包栈</h1>
+                                            <p className="text-orange-600 font-bold mt-2">极速包点师</p>
+                                            <p className="text-xs text-gray-400 mt-2">等待图片上传: assets/cover.png</p>
                                     </div>
                                 }
                             />
-                            {/* 圣诞装饰：封面上的帽子和树 */}
                             <div className="absolute -top-4 -right-2 text-6xl transform rotate-12 drop-shadow-lg z-20 pointer-events-none filter hue-rotate-15">🎅🏻</div>
                             <div className="absolute bottom-4 -left-4 text-5xl transform -rotate-12 drop-shadow-lg z-20 pointer-events-none">🎄</div>
                         </div>
                     </div>
 
-                    {/* 按钮 */}
                     <div className="w-full space-y-4 px-4 shrink-0 z-10">
                         <button onClick={startGame} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 px-6 rounded-2xl text-xl shadow-[0_6px_0_#991b1b] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-3 border-2 border-red-700"><Utensils className="animate-bounce" size={24} /> 开始制作</button>
                         <button onClick={() => setGameState('LEADERBOARD')} className="w-full bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold py-3 px-6 rounded-2xl text-lg shadow-[0_6px_0_#ca8a04] active:shadow-none active:translate-y-1.5 transition-all flex items-center justify-center gap-2 border-2 border-yellow-500"><Trophy size={20} /> 大师排行榜</button>
@@ -726,7 +750,7 @@
                         </div>
                     </div>
                 </div>
-                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.4 (Analytics)</span></div>
+                <div className="text-orange-900/30 text-[10px] font-black tracking-widest mt-4 z-10 shrink-0 flex flex-col items-center gap-0.5"><span>Dev by Weehom Liau • V1.5 (Stable)</span></div>
                 {showInstallModal && (<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowInstallModal(false)}><div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl"><button onClick={() => setShowInstallModal(false)} className="absolute top-4 right-4 text-gray-400"><XCircle size={24} /></button><h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2"><Download className="text-red-600" size={24}/> 安装游戏</h3>{isIOS ? (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 iPhone/iPad 上：</p><ol className="list-decimal list-inside space-y-3 text-sm"><li className="flex items-start gap-2"><span className="mt-0.5">点击浏览器底部的</span><span className="inline-flex items-center justify-center bg-gray-100 p-1 rounded border"><Share size={14}/></span><span>分享按钮</span></li><li className="flex items-start gap-2"><span className="mt-0.5">向下滑动，选择</span><span className="inline-flex items-center gap-1 font-bold text-black bg-gray-100 px-2 py-0.5 rounded border"><PlusSquare size={14}/> 添加到主屏幕</span></li></ol></div>) : (<div className="space-y-4 text-gray-600"><p className="font-bold text-black">📱 在 Android 浏览器上：</p><ol className="list-decimal list-inside space-y-2 text-sm"><li>点击右上角的菜单图标 (⋮)</li><li>选择 <strong>安装应用</strong> 或 <strong>添加到主屏幕</strong></li></ol></div>)}<button onClick={() => setShowInstallModal(false)} className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl">知道了</button></div></div>)}
               </div>
             );
@@ -855,8 +879,18 @@
                   <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6 animate-pop gpu-accel relative z-10">
                       <div className="text-white/90 text-center text-sm font-bold tracking-widest mb-2">疯狂交替点击！+1分</div>
                       <div className="flex gap-4 w-full h-64">
-                          <button onPointerDown={(e) => handleFeverClick('left', e)} className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}><span className="text-6xl group-active:scale-125 transition-transform">🥟</span><span className="text-2xl font-black text-orange-600">捏包</span></button>
-                          <button onPointerDown={(e) => handleFeverClick('right', e)} className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}><span className="text-6xl group-active:scale-125 transition-transform">♨️</span><span className="text-2xl font-black text-red-600">蒸包</span></button>
+                          <button 
+                            onPointerDown={(e) => handleFeverClick('left', e)} 
+                            className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}
+                          >
+                            <span className="text-6xl group-active:scale-125 transition-transform">🥟</span><span className="text-2xl font-black text-orange-600">捏包</span>
+                          </button>
+                          <button 
+                            onPointerDown={(e) => handleFeverClick('right', e)} 
+                            className={`flex-1 bg-white rounded-3xl shadow-xl border-b-8 border-gray-200 active:border-b-0 active:translate-y-2 transition-transform duration-75 flex flex-col items-center justify-center gap-2 group btn-press active:scale-90`}
+                          >
+                            <span className="text-6xl group-active:scale-125 transition-transform">♨️</span><span className="text-2xl font-black text-red-600">蒸包</span>
+                          </button>
                       </div>
                       <div className="text-4xl font-black text-yellow-300 drop-shadow-lg animate-bounce">SCORE: {score}</div>
                   </div>
@@ -907,9 +941,9 @@
                             <div className="flex flex-col items-center w-full justify-center h-full">
                                <div className="relative w-64 h-64 flex items-center justify-center">
                                   <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 pointer-events-none z-10 w-full flex justify-center">
-                                         <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
-                                         <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
-                                         <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
+                                             <div className="text-5xl opacity-0 animate-steam absolute" style={{animationDelay: '0s'}}>☁️</div>
+                                             <div className="text-4xl opacity-0 animate-steam absolute -left-8 top-4" style={{animationDelay: '0.8s'}}>☁️</div>
+                                             <div className="text-4xl opacity-0 animate-steam absolute left-8 top-4" style={{animationDelay: '1.6s'}}>☁️</div>
                                   </div>
                                   <div className="w-full h-full relative animate-pump gpu-accel">
                                      <SafeImage src="./assets/steamer.png" alt="Steamer" className="w-full h-full object-contain" fallbackIcon={<div className="w-48 h-40 bg-gradient-to-b from-orange-100 to-orange-300 rounded-[20px] border-b-8 border-orange-400 relative flex items-center justify-center"><div className="absolute -top-8 left-0 w-full h-16 bg-orange-200 rounded-[50%] border-4 border-orange-300 shadow-inner flex items-center justify-center"><span className="text-6xl">♨️</span></div></div>} />
