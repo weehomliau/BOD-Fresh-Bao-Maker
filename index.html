@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>B.O.D 包栈：极速包点师 (稳定版)</title>
+    <title>B.O.D 包栈：极速包点师 (防作弊加强版)</title>
     
     <link rel="icon" type="image/png" href="assets/cover.png">
     <link rel="apple-touch-icon" href="assets/cover.png">
@@ -66,6 +66,7 @@
 
         const GAME_DURATION = 90; 
         const FEVER_DURATION = 5000; 
+        const MAGIC_SALT = 123456; // 简单的混淆盐值
 
         const REWARDS_CONFIG = [
             { id: 'r1', score: 1000, title: '优秀学徒', discount: 'RM5 OFF', minSpend: 'Min Spend RM50', code: 'BN5', expiry: '31/12' },
@@ -213,8 +214,6 @@
                 if (isCompletedRef.current) return;
                 playSfx('pop');
 
-                // 移除：位置瞬移逻辑已删除，包子现在保持静止
-
                 setProgress(prev => {
                     const next = prev + 15;
                     if (next >= 100) {
@@ -235,7 +234,6 @@
                    <div 
                         className="w-48 h-48 bg-orange-100 rounded-full border-4 border-orange-200 shadow-xl flex items-center justify-center cursor-pointer relative overflow-hidden btn-press gpu-accel z-10 transition-transform duration-75 ease-out" 
                         onPointerDown={handlePointerDown}
-                        // 移除：transform 属性已删除
                    >
                      <SafeImage src="assets/folding_bun.png" alt="Raw Bun" className="w-full h-full object-cover pointer-events-none" fallbackIcon={<div className="text-6xl">⚪</div>} />
                      <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" style={{ clipPath: `polygon(50% 50%, ${100-progress}% 0, 100% 0, 100% 100%, 0 100%, 0 0)` }}></div>
@@ -273,6 +271,9 @@
         function BODGame() {
           const [gameState, setGameState] = useState('MENU'); 
           const [score, setScore] = useState(0);
+          // 防作弊 4: 影子分数，简单的混淆逻辑
+          const [shadowScore, setShadowScore] = useState(0 ^ MAGIC_SALT);
+
           const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
           const [currentOrder, setCurrentOrder] = useState(null);
           const [worktable, setWorktable] = useState([]); 
@@ -310,6 +311,16 @@
           // 保留：Fever 模式下的点击频率限制
           const lastFeverClickTime = useRef(0);
           
+          // 防作弊 5: 验证分数更新
+          const updateScore = (increment) => {
+              setScore(prev => {
+                  const newScore = prev + increment;
+                  // 同时更新影子分数
+                  setShadowScore((prev ^ MAGIC_SALT) + increment ^ MAGIC_SALT);
+                  return newScore;
+              });
+          };
+
           useEffect(() => {
               gameStateRef.current = gameState;
               if (analytics) {
@@ -514,7 +525,7 @@
               lastFeverClickTime.current = now;
 
               playSfx('win'); 
-              setScore(prev => prev + 1);
+              updateScore(1); // 使用 updateScore
               setFeverClickAnim(side);
               setTimeout(() => setFeverClickAnim(null), 50); 
           };
@@ -527,6 +538,7 @@
              if (analytics) logEvent(analytics, 'level_start');
              
              setScore(0);
+             setShadowScore(0 ^ MAGIC_SALT); // 重置影子分数
              setCombo(0); 
              setIsFever(false);
              setTimeLeft(GAME_DURATION);
@@ -565,6 +577,29 @@
           };
 
           const handleSaveScore = async () => {
+            // 防作弊 6: 环境检测 - 检查是否在下载的 HTML 环境中 (file: 协议)
+            // 注意：不要在开发环境屏蔽 localhost
+            if (window.location.protocol === 'file:') {
+                showFeedback('❌ 离线环境无法上传成绩', 'error');
+                return;
+            }
+
+            // 防作弊 7: 影子分数完整性校验
+            // 如果玩家只是修改了 score 变量，没有修改 shadowScore，这里就会通过
+            if (score !== (shadowScore ^ MAGIC_SALT)) {
+                showFeedback('⚠️ 数据异常，操作无效', 'error');
+                console.error("Integrity check failed");
+                return;
+            }
+
+            // 防作弊 8: 理论最大值校验
+            // 假设 90秒，Fever加时假设最多30秒，总共120秒
+            // 极限手速 20次/秒 (50ms)，理想最高分大概在 3000-5000 左右
+            if (score > 6000) {
+                showFeedback('🚫 异常高分，无法上传', 'error');
+                return;
+            }
+
             if (!playerName.trim()) {
               showFeedback('✍️ 请输入名字！', 'error');
               return;
@@ -655,8 +690,9 @@
               const points = 100 + Math.floor(timeLeft / 10);
               const comboBonus = Math.floor(points * (newCombo * 0.1));
               const totalPoints = points + comboBonus;
-              const newScore = score + totalPoints;
-              setScore(newScore); 
+              
+              updateScore(totalPoints); // 使用 updateScore 更新分数
+
               showFeedback(`${msg} +${totalPoints} (连击 x${newCombo})`, 'success');
               if (newCombo > 0 && newCombo % 5 === 0) {
                   setTimeout(startFeverMode, 500); 
